@@ -10,6 +10,7 @@
 
 ### Edge SDK 설치
 - dist 폴더 내의 mellerikatedge 파일을 다운받고, 설치합니다.
+- wget https://github.com/mellerikat/EdgeSDK/raw/refs/heads/v1.0.0/dist/mellerikatedge-1.0-py3-none-any.whl
 - pip install mellerikatedge-1.0-py3-none-any.whl
 
 ### Edge SDK를 위한 config 파일을 생성
