@@ -11,7 +11,7 @@ import sys
 import importlib
 from loguru import logger
 
-class EdgeAppEmulator:
+class Emulator:
     jwt_token = None
     model_info = {}
     new_model_deployed = False

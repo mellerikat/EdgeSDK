@@ -24,7 +24,7 @@ pip install mellerikatedge-1.0-py3-none-any.whl
 Create a file named emulator_config.yaml at a location of your choice with the following content:
 
 ```yaml
-alo_dir: /home/user/projects/alo # Path to ALO
+alo_dir: /home/user/projects/alo # ALO Path
 edge_conductor_location: cloud # Environment of Edge Conductor (cloud or on-premise)
 edge_conductor_url: https://edgecond.try-mellerikat.com # URL of Edge Conductor (include https or http)
 edge_security_key: edge-emulator-{{user_id}}-{{number}} # Unique key to identify Edge, fill in {{ }} with appropriate values
@@ -37,9 +37,9 @@ model_info: # Will be filled in when the SDK runs and the model is deployed
 
 ## Example of Using Edge App Emulator
 ```python
-    from mellerikatedge.edge_app_emulator import EdgeAppEmulator
+    import mellerikatedge.edgeapp as edgeapp
 
-    emulator = EdgeAppEmulator('emulator_config.yaml path')
+    emulator = edgeapp.Emulator('emulator_config.yaml path')
     try :
         emulator.start()
         if emulator.deploy_model():
