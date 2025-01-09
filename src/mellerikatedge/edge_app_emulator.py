@@ -1,9 +1,9 @@
 import os
-import edge_sdk.sdk_utils as sdk_utils
+import mellerikatedge.edge_utils as edge_utils
 
 import tarfile
 import shutil
-from edge_sdk.edge_client import EdgeClient
+from mellerikatedge.edge_client import EdgeClient
 
 import pandas as pd
 
@@ -19,7 +19,7 @@ class EdgeAppEmulator:
 
     def __init__(self, config_path):
         self.config_path = config_path
-        self.config = sdk_utils.load_yaml(config_path)
+        self.config = edge_utils.load_yaml(config_path)
 
         config_dir = os.path.dirname(config_path)
         self.log_path = os.path.join(config_dir, 'edge.log')
@@ -65,7 +65,7 @@ class EdgeAppEmulator:
             self.client.connect()
             self.initialized = True
         else:
-            device_info = sdk_utils.get_device_info()
+            device_info = edge_utils.get_device_info()
             logger.info(device_info)
             self.client.request_register(device_info)
 
@@ -109,7 +109,7 @@ class EdgeAppEmulator:
                     logger.info(f"Extracted {model_zip_path} to {model_path} successfully.")
 
                 self.config['model_info'] = self.model_info
-                sdk_utils.save_yaml(self.config_path, self.config)
+                edge_utils.save_yaml(self.config_path, self.config)
 
             except tarfile.TarError as e:
                 logger.error(f"An error occurred: {e}")
@@ -125,28 +125,28 @@ class EdgeAppEmulator:
                     initialized = False
                     return False
 
-                metadata_json = sdk_utils.load_json(metadata_path)
+                metadata_json = edge_utils.load_json(metadata_path)
                 logger.info("extract user parameter")
-                selected_train_parameter, selected_inference_parameter = sdk_utils.extract_selected_user_parameters(metadata_json)
+                selected_train_parameter, selected_inference_parameter = edge_utils.extract_selected_user_parameters(metadata_json)
 
                 solution_dir = os.path.join(alo_dir, 'solution')
                 plan_path = os.path.join(solution_dir, 'experimental_plan.yaml')
 
-                plan_yaml = sdk_utils.load_yaml(plan_path)
+                plan_yaml = edge_utils.load_yaml(plan_path)
                 # logger.info("update train parameter")
                 # train_pipeline = plan_yaml['user_parameters'][0]['train_pipeline']
-                # updated_train_pipeline = sdk_utils.update_pipeline(train_pipeline, selected_train_parameter)
+                # updated_train_pipeline = edge_utils.update_pipeline(train_pipeline, selected_train_parameter)
                 # plan_yaml['user_parameters'][0]['train_pipeline'] = updated_train_pipeline
 
                 logger.info("update inference parameter")
                 inference_pipeline = plan_yaml['user_parameters'][1]['inference_pipeline']
                 print(inference_pipeline)
                 print(selected_inference_parameter)
-                updated_inference_pipeline = sdk_utils.update_pipeline(inference_pipeline, selected_inference_parameter)
+                updated_inference_pipeline = edge_utils.update_pipeline(inference_pipeline, selected_inference_parameter)
                 plan_yaml['user_parameters'][1]['inference_pipeline'] = updated_inference_pipeline
 
                 logger.info("save plan yaml")
-                sdk_utils.save_yaml(plan_path, plan_yaml)
+                edge_utils.save_yaml(plan_path, plan_yaml)
             except Exception as e:
                 logger.error(f"Update metadata error: {e}")
                 logger.error("Please confirm if the version of AI Solution code is the same.")
@@ -177,11 +177,11 @@ class EdgeAppEmulator:
             shutil.rmtree(inference_data_dir)
         os.makedirs(inference_data_dir)
 
-        sdk_utils.copy_file_to_folder(file_path, inference_data_dir)
+        edge_utils.copy_file_to_folder(file_path, inference_data_dir)
 
-        plan_yaml = sdk_utils.load_yaml(plan_path)
-        sdk_utils.update_inference_data_path(plan_yaml, inference_data_dir)
-        sdk_utils.save_yaml(plan_path, plan_yaml)
+        plan_yaml = edge_utils.load_yaml(plan_path)
+        edge_utils.update_inference_data_path(plan_yaml, inference_data_dir)
+        edge_utils.save_yaml(plan_path, plan_yaml)
 
         return self.run_alo_inference()
 
@@ -203,9 +203,9 @@ class EdgeAppEmulator:
 
         df.to_csv(inference_data_path, index=False)
 
-        plan_yaml = sdk_utils.load_yaml(plan_path)
-        sdk_utils.update_inference_data_path(plan_yaml, inference_data_dir)
-        sdk_utils.save_yaml(plan_path, plan_yaml)
+        plan_yaml = edge_utils.load_yaml(plan_path)
+        edge_utils.update_inference_data_path(plan_yaml, inference_data_dir)
+        edge_utils.save_yaml(plan_path, plan_yaml)
 
         return self.run_alo_inference()
 
@@ -261,12 +261,12 @@ class EdgeAppEmulator:
             logger.error('output folder is not exist')
             return
 
-        score_yaml = sdk_utils.load_yaml(score_path)
+        score_yaml = edge_utils.load_yaml(score_path)
         logger.info(score_yaml['note'])
 
         zip_path = os.path.join(alo_dir, 'inference_artifacts.zip')
 
-        sdk_utils.zip_folder(inference_artifacts_folder, zip_path)
+        edge_utils.zip_folder(inference_artifacts_folder, zip_path)
 
         model_info = self.config['model_info']
         result_info = model_info
@@ -274,13 +274,13 @@ class EdgeAppEmulator:
         result_info['score'] = score_yaml['score']
         result_info['note'] = score_yaml['note']
 
-        tabular_path = sdk_utils.find_tabular_file(output_folder)
+        tabular_path = edge_utils.find_tabular_file(output_folder)
         if tabular_path is not None:
             result_info['tabular'] = f"output/{tabular_path}"
         else:
             result_info['tabular'] = None
 
-        image_path = sdk_utils.find_image_file(output_folder)
+        image_path = edge_utils.find_image_file(output_folder)
         if image_path is not None:
             result_info['non-tabular'] = f"output/{image_path}"
         else :

@@ -1,6 +1,6 @@
 import os
 import requests
-import edge_sdk.sdk_utils as sdk_utils
+import mellerikatedge.edge_utils as edge_utils
 
 import json
 import asyncio
@@ -20,12 +20,12 @@ class EdgeClient:
     def __init__(self, config):
         nest_asyncio.apply()
 
-        self.url = sdk_utils.remove_trailing_slash(config['edge_conductor_url'])
+        self.url = edge_utils.remove_trailing_slash(config['edge_conductor_url'])
         self.security_key = config['edge_security_key']
         if config['edge_conductor_location'] == 'cloud':
-            self.websocket_url = f"wss://{sdk_utils.remove_http_https(self.url)}/app/api/v1/socket/{self.security_key}"
+            self.websocket_url = f"wss://{edge_utils.remove_http_https(self.url)}/app/api/v1/socket/{self.security_key}"
         else:
-            self.websocket_url = f"ws://{sdk_utils.remove_http_https(self.url)}/app/api/v1/socket/{self.security_key}"
+            self.websocket_url = f"ws://{edge_utils.remove_http_https(self.url)}/app/api/v1/socket/{self.security_key}"
 
         logger.info(self.websocket_url)
 

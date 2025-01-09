@@ -1,9 +1,0 @@
-alo_dir: /home/gyulim.gu/projects/EdgeSDK/alo
-edge_conductor_location: cloud
-edge_conductor_url: https://edgecond.try-mellerikat.com
-edge_registered: null
-edge_security_key: edge-sdk-emulator-gyulim.gu2
-model_info:
-  model_seq: 58
-  model_version: '2.1'
-  stream_name: '[Try] Bolt Fastening Anomaly Detection'
