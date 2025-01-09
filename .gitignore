@@ -1,0 +1,9 @@
+/alo
+/alo_tcr
+/build
+/dist
+/src/edge_sdk.egg-info
+edge.log
+*.pyc
+**/__pycache__
+*.csv

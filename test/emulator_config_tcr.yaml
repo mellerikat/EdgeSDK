@@ -1,0 +1,8 @@
+alo_dir: /home/gyulim.gu/projects/edge_sdk/alo_tcr
+edge_conductor_location: cloud
+edge_conductor_url: https://edgecond.try-mellerikat.com
+edge_security_key: edge-sdk-emulator-gyulim.gu-8
+model_info:
+  model_seq: 7
+  model_version: '1.0'
+  stream_name: '[Try] Customer Churn Classification'
