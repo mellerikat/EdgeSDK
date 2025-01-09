@@ -84,8 +84,7 @@ class EdgeClient:
             "device_cpu": device_info["device_cpu"],
             "device_gpu": device_info["device_gpu"]
         }
-
-        # POST 요청 보내기 (content-type은 기본적으로 application/json이므로 headers 생략 가능합니다)
+        
         response = requests.post(url, json=data)
 
         # 응답 확인

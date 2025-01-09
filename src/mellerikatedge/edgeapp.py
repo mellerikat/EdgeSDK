@@ -24,6 +24,7 @@ class Emulator:
         config_dir = os.path.dirname(config_path)
         self.log_path = os.path.join(config_dir, 'edge.log')
 
+        logger.remove()
         logger.add(self.log_path, format="{time:YYYY-MM-DD HH:mm:ss}|{level}|{message}")
         self.client = EdgeClient(self.config)
 
