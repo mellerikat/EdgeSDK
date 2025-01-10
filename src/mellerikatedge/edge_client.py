@@ -29,23 +29,6 @@ class EdgeClient:
 
         logger.info(self.websocket_url)
 
-    async def receive(self, websocket):
-        while True:
-            try:
-                message = await asyncio.wait_for(websocket.recv(), timeout=100)
-                logger.info(message)
-                for msg, data in json.loads(message).items():
-                    logger.info(f'websocket - data: {data}')
-                    logger.info(f'websocket - msg: {msg}')
-            except asyncio.TimeoutError:
-                #logger.info(f"Idle for {args.timeout}s, closing connection")
-                logger.warning('websocket timeout')
-                # await websocket.close()
-                break
-            except Exception as e:
-                logger.warning(f'websocket disconnected: {e}')
-                break
-
     async def connect_edgeconductor(self):
         headers = {
             "Authorization": f"Bearer {self.jwt_token}",
@@ -54,17 +37,9 @@ class EdgeClient:
         async with websockets.connect(self.websocket_url, additional_headers =headers) as websocket:
             self.websocket = websocket
             logger.info('websocket connect')
-            self.receive_task = asyncio.create_task(self.receive(websocket))
-            await self.receive_task
 
     async def close_websocket(self):
         if self.websocket:
-            if self.receive_task:
-                self.receive_task.cancel()  # 태스크 취소
-                try:
-                    await self.receive_task  # 태스크가 취소되기를 기다림
-                except asyncio.CancelledError:
-                    logger.info("receive task cancelled")
             await self.websocket.close()
             logger.info("websocket closed")
 
