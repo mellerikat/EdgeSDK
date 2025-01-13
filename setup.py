@@ -10,7 +10,7 @@ setup(
     package_dir={"": "src"},
     install_requires=[
         'requests',
-        'websockets',
+        'websockets==10.4',
         'pandas',
         'loguru',
         'PyYAML',

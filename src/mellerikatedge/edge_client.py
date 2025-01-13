@@ -34,7 +34,7 @@ class EdgeClient:
             "Authorization": f"Bearer {self.jwt_token}",
         }
 
-        async with websockets.connect(self.websocket_url, additional_headers =headers) as websocket:
+        async with websockets.connect(self.websocket_url, extra_headers=headers) as websocket:
             self.websocket = websocket
             logger.info('websocket connect')
 
