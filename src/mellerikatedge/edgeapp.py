@@ -24,8 +24,8 @@ class Emulator:
         config_dir = os.path.dirname(config_path)
         self.log_path = os.path.join(config_dir, 'edge.log')
 
-        logger.remove()
-        logger.add(self.log_path, format="{time:YYYY-MM-DD HH:mm:ss}|{level}|{message}")
+        # logger.remove()
+        logger.add(self.log_path, format="{time:YYYY-MM-DD HH:mm:ss}|{level}|{file}:{line}|{message}")
         self.client = EdgeClient(self.config)
 
     def start(self):
@@ -47,6 +47,10 @@ class Emulator:
 
             if deployed_info is None and deploy_model is None:
                 logger.error("First, deploy the model on Edge Conductor.")
+                return
+
+            if deployed_info is not None and 'model_seq' not in self.config.get('model_info', {}):
+                logger.error("The model information is incorrect. Deploy the model again")
                 return
 
             if deployed_info is not None and deployed_info['model_seq'] != self.config['model_info']['model_seq']:

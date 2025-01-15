@@ -161,8 +161,15 @@ class EdgeClient:
         response = requests.get(url, headers=headers, stream=True)
 
         if response.status_code == 200:
-            logger.info(response.headers.get('Content-Disposition'))
-            file_name = response.headers.get('Content-Disposition').split('filename=')[-1]
+            content_disposition = response.headers.get('Content-Disposition')
+            if content_disposition:
+                file_name = content_disposition.split('filename=')[-1].strip().strip("\"'")
+            else:
+                logger.warning("Content-Disposition header is missing.")
+                file_name = f"model.tar.gz"  # 기본 파일명 생성
+
+            # logger.info(response.headers.get('Content-Disposition'))
+            # file_name = response.headers.get('Content-Disposition').split('filename=')[-1]
             file_path = os.path.join(download_dir, 'model.tar.gz')
             with open(file_path, 'wb') as file:
                 for chunk in response.iter_content(chunk_size=8192):
