@@ -20,13 +20,14 @@ class EdgeClient:
     def __init__(self, config):
         nest_asyncio.apply()
 
-        self.url = edge_utils.remove_trailing_slash(config['edge_conductor_url'])
-        self.security_key = config['edge_security_key']
-        if config['edge_conductor_location'] == 'cloud':
+        self.url = edge_utils.remove_trailing_slash(config[edge_utils.CONFIG_EDGE_COND_URL])
+        self.security_key = config[edge_utils.CONFIG_EDGE_SECURITY_KEY]
+        if config[edge_utils.CONFIG_EDGE_COND_LOCATION] == edge_utils.CONFIG_EDGE_COND_LOCATION_CLOUD:
             self.websocket_url = f"wss://{edge_utils.remove_http_https(self.url)}/app/api/v1/socket/{self.security_key}"
         else:
             self.websocket_url = f"ws://{edge_utils.remove_http_https(self.url)}/app/api/v1/socket/{self.security_key}"
 
+        self.websocket = None
         logger.info(self.websocket_url)
 
     async def connect_edgeconductor(self):
@@ -40,14 +41,19 @@ class EdgeClient:
 
     async def close_websocket(self):
         if self.websocket:
-            await self.websocket.close()
-            logger.info("websocket closed")
+            try:
+                await self.websocket.close()
+                logger.info("websocket closed")
+            except Exception as e:
+                logger.error(f"Failed to close websocket: {e}")
+        else:
+            logger.warning("No websocket connection to close")
 
     def connect(self):
         asyncio.run(self.__connect())
 
     async def __connect(self):
-        asyncio.gather(self.connect_edgeconductor())
+        await self.connect_edgeconductor()
 
     def disconnect(self):
         try:
