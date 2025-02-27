@@ -3,12 +3,16 @@ import platform
 import uuid
 import psutil
 import json
-import yaml
+# import yaml
 import glob
 import zipfile
 import shutil
 from loguru import logger
-from collections import OrderedDict
+
+from ruamel.yaml import YAML
+yaml = YAML()
+yaml.preserve_quotes = True  # 따옴표 스타일 유지 (선택)
+yaml.indent(mapping=2, sequence=4, offset=2)  # 들여쓰기 설정 (선택)
 
 # config
 CONFIG_SOLUTION_DIR = "solution_dir"
@@ -22,7 +26,6 @@ CONFIG_EDGE_COND_LOCATION_ONPREMISE = "onprimise"
 CONFIG_EDGE_SECURITY_KEY = "edge_security_key"
 CONFIG_MODEL_INFO = "model_info"
 
-
 def zip_folder(folder_path, output_path):
     with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as zipf:
         for root, dirs, files in os.walk(folder_path):
@@ -32,41 +35,43 @@ def zip_folder(folder_path, output_path):
                 zipf.write(file_path, arcname)
 
 
-# def load_yaml(path):
-#     with open(path, 'r') as file:
-#         yaml_data = yaml.safe_load(file)
-#     return yaml_data
+def load_yaml(path):
+    # with open(path, 'r') as file:
+    #     yaml_data = yaml.safe_load(file)
+    with open(path, 'r') as file:
+        yaml_data = yaml.load(file)
+    return yaml_data
 
-# def save_yaml(path, yaml_data):
-#     with open(path, 'w') as file:
-#         yaml.dump(yaml_data, file, default_flow_style=False)
+def save_yaml(path, yaml_data):
+    with open(path, 'w') as file:
+        # yaml.dump(yaml_data, file, default_flow_style=False)
+        yaml.dump(yaml_data, file)
 
-
-class OrderedLoader(yaml.SafeLoader):
-    pass
-
-
-def construct_ordered_map(loader, node):
-    return OrderedDict(loader.construct_pairs(node))
+# class OrderedLoader(yaml.SafeLoader):
+#     pass
 
 
-OrderedLoader.add_constructor(
-    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, construct_ordered_map
-)
+# def construct_ordered_map(loader, node):
+#     return OrderedDict(loader.construct_pairs(node))
 
 
-# YAML 파일 로드: 순서 유지
-def load_yaml(file_path):
-    with open(file_path, "r", encoding="utf-8") as f:
-        return yaml.load(f, Loader=OrderedLoader)
+# OrderedLoader.add_constructor(
+#     yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, construct_ordered_map
+# )
 
 
-# YAML 파일 저장: 순서 유지
-def save_yaml(file_path, data):
-    with open(file_path, "w", encoding="utf-8") as f:
-        yaml.dump(
-            data, f, allow_unicode=True, default_flow_style=False, sort_keys=False
-        )
+# # YAML 파일 로드: 순서 유지
+# def load_yaml(file_path):
+#     with open(file_path, "r", encoding="utf-8") as f:
+#         return yaml.load(f, Loader=OrderedLoader)
+
+
+# # YAML 파일 저장: 순서 유지
+# def save_yaml(file_path, data):
+#     with open(file_path, "w", encoding="utf-8") as f:
+#         yaml.dump(
+#             data, f, allow_unicode=True, default_flow_style=False, sort_keys=False
+#         )
 
 
 def load_json(file_path):
@@ -218,26 +223,27 @@ def update_pipeline(pipeline, selected_parameters):
                         step["args"].update(selected["args"])
     return pipeline
 
+def parse_inference_artifacts(path):
+    image_path = None
+    tabular_path = None
+    yaml_data = None
+    image_extensions = ('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.tif', '.webp')
 
-# def setup_logging(log_file='edge.log'):
-#     logger = logging.getLogger('Edge SDK')
-#     logger.setLevel(logging.DEBUG)  # 로깅 레벨 설정
+    with zipfile.ZipFile(path, 'r') as zip_ref:
+        for file_info in zip_ref.infolist():
+            if file_info.filename.startswith('output/'):
+                if file_info.filename.lower().endswith(image_extensions):
+                    image_path = file_info.filename
+                elif file_info.filename.lower().endswith('.csv'):
+                    tabular_path = file_info.filename
 
-#     # 콘솔 핸들러 설정
-#     console_handler = logging.StreamHandler()
-#     console_handler.setLevel(logging.DEBUG)
+            # Check for YAML file in score directory
+            if file_info.filename == 'score/inference_summary.yaml':
+                with zip_ref.open(file_info) as yaml_file:
+                    yaml_data = yaml.load(yaml_file)
 
-#     # 파일 핸들러 설정
-#     file_handler = logging.FileHandler(log_file)
-#     file_handler.setLevel(logging.DEBUG)
+            # Exit early if all paths and YAML data are found
+            if image_path and tabular_path and yaml_data:
+                break
 
-#     # 포맷터 설정
-#     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-#     console_handler.setFormatter(formatter)
-#     file_handler.setFormatter(formatter)
-
-#     # 핸들러를 로거에 추가
-#     logger.addHandler(console_handler)
-#     logger.addHandler(file_handler)
-
-#     return logger
+    return image_path, tabular_path, yaml_data

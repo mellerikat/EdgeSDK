@@ -11,12 +11,13 @@ import sys
 import importlib
 from loguru import logger
 
-#CONFIG
+import subprocess
+import copy
 
 class Emulator:
     jwt_token = None
-    CONFIG_MODEL_INFO = {}
-    new_model_deployed = False
+
+    download_new_model = False
     initialized = False
 
     def __init__(self, config_path):
@@ -35,16 +36,20 @@ class Emulator:
         self.alo_dir = self.config[edge_utils.CONFIG_SOLUTION_DIR]
         if self.alo_version == "v2":
             self.solution_dir = os.path.join(self.alo_dir, "solution")
-            self.train_artifacts_path = os.path.join(self.alo_dir, 'train_artifacts')
-            self.update_model_dir = os.path.join(self.train_artifacts_path, 'models')
+            self.train_artifact_dir = os.path.join(self.alo_dir, 'train_artifacts')
+            self.inference_artifact_dir = os.path.join(self.alo_dir, 'inference_artifacts')
+            self.update_model_dir = os.path.join(self.train_artifact_dir, 'models')
         else:
             self.solution_dir = self.alo_dir
-            self.train_artifacts_path = os.path.join(self.alo_dir, 'train_artifact')
-            self.update_model_dir = self.train_artifacts_path
+            self.train_artifact_dir = os.path.join(self.alo_dir, 'train_artifact')
+            self.inference_artifact_dir = os.path.join(self.alo_dir, 'inference_artifact')
+            self.update_model_dir = self.train_artifact_dir
 
         self.sdk_dir = os.path.join(self.solution_dir, "edge_sdk")
         self.new_model_dir = os.path.join(self.sdk_dir, "model")
         self.inference_data_dir = os.path.join(self.sdk_dir, "inference")
+        self.plan_path = os.path.join(self.solution_dir, "experimental_plan.yaml")
+        self.new_model_info = {}
 
         self.client = EdgeClient(self.config)
 
@@ -85,24 +90,27 @@ class Emulator:
                 logger.error("First, deploy the model on Edge Conductor.")
                 return
 
-            if deployed_info is not None and 'model_seq' not in self.config.get(edge_utils.CONFIG_MODEL_INFO, {}):
-                logger.error("The model information is incorrect. Deploy the model again")
-                return
+            # if deployed_info is not None and 'model_seq' not in self.config.get(edge_utils.CONFIG_MODEL_INFO, {}):
+            #     logger.error("The model information is incorrect. Deploy the model again")
+            #     # return
 
-            if deployed_info is not None and deployed_info['model_seq'] != self.config[edge_utils.CONFIG_MODEL_INFO]['model_seq']:
-                logger.error("The model information is incorrect. Please delete the information in the configuration.")
-                return
+            # if deployed_info is not None and deployed_info['model_seq'] != self.config[edge_utils.CONFIG_MODEL_INFO]['model_seq']:
+            #     logger.warning("The model information is incorrect. Please delete the information in the configuration.")
+                # return
 
             if deploy_model != None:
                 logger.info("New model deployed")
-                self.CONFIG_MODEL_INFO['model_seq'] = deploy_model['model_seq']
-                self.CONFIG_MODEL_INFO['model_version'] = deploy_model['model_version']
-                self.CONFIG_MODEL_INFO['stream_name'] = deploy_model['stream_name']
-                self.new_model_deployed = True
+                self.new_model_info = copy.deepcopy(deploy_model)
+                self.download_new_model = True
             else :
-                self.CONFIG_MODEL_INFO = {}
-                self.new_model_deployed = False
-
+                if deployed_info is not None:
+                    if self.config[edge_utils.CONFIG_MODEL_INFO]['model_seq'] != deployed_info['model_seq']:
+                        logger.error("The model information is incorrect. Deploy the model again")
+                        self.new_model_info = copy.deepcopy(deployed_info)
+                        self.download_new_model = True
+                else:
+                    self.new_model_info = {}
+                    self.download_new_model = False
 
             self.initialized = True
         else:
@@ -118,14 +126,14 @@ class Emulator:
             logger.warning('Not initialized')
             return False
 
-        if self.new_model_deployed is not True:
+        if self.download_new_model is not True:
             logger.info('Use exist model')
             return True
         else:
             logger.info("Deploy new model")
 
-            self.client.download_model(self.CONFIG_MODEL_INFO['model_seq'], self.new_model_dir)
-            self.client.download_metadata(self.CONFIG_MODEL_INFO['model_seq'], self.new_model_dir)
+            self.client.download_model(self.new_model_info['model_seq'], self.new_model_dir)
+            self.client.download_metadata(self.new_model_info['model_seq'], self.new_model_dir)
 
             # Model
             model_file_name = "model.tar.gz"
@@ -136,12 +144,12 @@ class Emulator:
                 return
 
             # Create Model Dir
-            if os.path.exists(self.train_artifacts_path):
-                shutil.rmtree(self.train_artifacts_path)
+            if os.path.exists(self.train_artifact_dir):
+                shutil.rmtree(self.train_artifact_dir)
             os.makedirs(self.update_model_dir)
 
             # if self.alo_version == "v2":
-            #     model_path = os.path.join(self.train_artifacts_path, 'models')
+            #     model_path = os.path.join(self.train_artifact_dir, 'models')
             #     os.makedirs(model_path)
 
             if self.alo_version == "v2":
@@ -149,9 +157,6 @@ class Emulator:
                     with tarfile.open(model_zip_path, "r:gz") as tar:
                         tar.extractall(path=self.update_model_dir)
                         logger.info(f"Extracted {model_zip_path} to {self.update_model_dir} successfully.")
-
-                    self.config[edge_utils.CONFIG_MODEL_INFO] = self.CONFIG_MODEL_INFO
-
                 except tarfile.TarError as e:
                     logger.error(f"An error occurred: {e}")
                     initialized = False
@@ -161,6 +166,7 @@ class Emulator:
                     edge_utils.copy_file_to_folder(model_zip_path, self.update_model_dir)
                 except Exception as e:
                     logger.error(f"Update model error: {e}")
+                    return False
 
             #Metadata
             try:
@@ -179,10 +185,6 @@ class Emulator:
 
                     plan_path = os.path.join(self.solution_dir, 'experimental_plan.yaml')
                     plan_yaml = edge_utils.load_yaml(plan_path)
-                    # logger.info("update train parameter")
-                    # train_pipeline = plan_yaml['user_parameters'][0]['train_pipeline']
-                    # updated_train_pipeline = edge_utils.update_pipeline(train_pipeline, selected_train_parameter)
-                    # plan_yaml['user_parameters'][0]['train_pipeline'] = updated_train_pipeline
 
                     logger.info("update inference parameter")
                     inference_pipeline = plan_yaml['user_parameters'][1]['inference_pipeline']
@@ -193,14 +195,21 @@ class Emulator:
 
                     logger.info("save plan yaml")
                     edge_utils.save_yaml(plan_path, plan_yaml)
+                else:
+                    logger.info("meta v3")
             except Exception as e:
                 logger.error(f"Update metadata error: {e}")
                 logger.error("Please confirm if the version of AI Solution code is the same.")
                 initialized = False
                 return False
 
-            if self.client.update_deploy_status(self.CONFIG_MODEL_INFO['model_seq'], "success"):
+            if self.client.update_deploy_status(self.new_model_info['model_seq'], "success"):
                 logger.info("update_deploy_status Success")
+
+                self.config[edge_utils.CONFIG_MODEL_INFO] = self.new_model_info
+
+                logger.info(self.config_path)
+                logger.info(self.config)
                 edge_utils.save_yaml(self.config_path, self.config)
                 return True
             else:
@@ -215,7 +224,6 @@ class Emulator:
             logger.warning('Not initialized')
             return
 
-        plan_path = os.path.join(self.solution_dir, "experimental_plan.yaml")
 
         if os.path.exists(self.inference_data_dir):
             shutil.rmtree(self.inference_data_dir)
@@ -223,9 +231,11 @@ class Emulator:
 
         edge_utils.copy_file_to_folder(file_path, self.inference_data_dir)
 
-        plan_yaml = edge_utils.load_yaml(plan_path)
-        edge_utils.update_inference_data_path(plan_yaml, self.inference_data_dir)
-        edge_utils.save_yaml(plan_path, plan_yaml)
+        plan_yaml = edge_utils.load_yaml(self.plan_path)
+        edge_utils.update_inference_data_path(self.alo_version, plan_yaml, self.inference_data_dir)
+        edge_utils.save_yaml(self.plan_path, plan_yaml)
+
+        self.input_name = os.path.basename(file_path)
 
         return self.run_alo_inference()
 
@@ -235,25 +245,19 @@ class Emulator:
             logger.warning('Not initialized')
             return
 
-        self.alo_dir = self.config[edge_utils.self.CONFIG_SOLUTION_DIR]
-        if self.CONFIG_ALO_VERSION == "v2":
-            self.CONFIG_SOLUTION_DIR = os.path.join(self.alo_dir, "solution")
-        else :
-            self.CONFIG_SOLUTION_DIR = self.alo_dir
+        inference_data_path = os.path.join(self.inference_data_dir, "dataframe.csv")
 
-        plan_path = os.path.join(self.CONFIG_SOLUTION_DIR, "experimental_plan.yaml")
-        inference_data_dir = os.path.join(self.CONFIG_SOLUTION_DIR, "emulator_inference")
-        inference_data_path = os.path.join(inference_data_dir, "inference_input.csv")
-
-        if os.path.exists(inference_data_dir):
-            shutil.rmtree(inference_data_dir)
-        os.makedirs(inference_data_dir)
+        if os.path.exists(self.inference_data_dir):
+            shutil.rmtree(self.inference_data_dir)
+        os.makedirs(self.inference_data_dir)
 
         df.to_csv(inference_data_path, index=False)
 
-        plan_yaml = edge_utils.load_yaml(plan_path)
-        edge_utils.update_inference_data_path(plan_yaml, inference_data_dir)
-        edge_utils.save_yaml(plan_path, plan_yaml)
+        plan_yaml = edge_utils.load_yaml(self.plan_path)
+        edge_utils.update_inference_data_path(self.alo_version, plan_yaml, self.inference_data_dir)
+        edge_utils.save_yaml(self.plan_path, plan_yaml)
+
+        self.input_name = "dataframe.csv"
 
         return self.run_alo_inference()
 
@@ -263,31 +267,38 @@ class Emulator:
             return
 
         logger.info('run_alo_inference')
-
-        self.alo_dir = self.config[edge_utils.self.CONFIG_SOLUTION_DIR]
-
-        sdk_working_dir = os.getcwd()
         success = True
-        try:
-            os.chdir(self.alo_dir)
-            sys.path.append(self.alo_dir)
-            # src_utils = importlib.import_module('src.utils')
-            # set_args = src_utils.set_args
-            # kwargs = vars(set_args())
-            # kwargs['mode'] = 'inference'
+        if self.alo_version == "v2":
+            sdk_working_dir = os.getcwd()
+            try:
+                os.chdir(self.alo_dir)
+                sys.path.append(self.alo_dir)
+                # src_utils = importlib.import_module('src.utils')
+                # set_args = src_utils.set_args
+                # kwargs = vars(set_args())
+                # kwargs['mode'] = 'inference'
 
-            kwargs = {'config': None, 'system': None, 'mode': 'inference', 'loop': False, 'computing': 'local'}
+                kwargs = {'config': None, 'system': None, 'mode': 'inference', 'loop': False, 'computing': 'local'}
 
-            src_alo = importlib.import_module('src.alo')
-            ALO = src_alo.ALO
-            alo_instance = ALO(**kwargs)
-            alo_instance.main()
+                src_alo = importlib.import_module('src.alo')
+                ALO = src_alo.ALO
+                alo_instance = ALO(**kwargs)
+                alo_instance.main()
 
-        except:
-            logger.error('run alo fail')
-            success = False
-        finally:
-            os.chdir(sdk_working_dir)
+            except:
+                logger.error('run alo fail')
+                success = False
+            finally:
+                os.chdir(sdk_working_dir)
+        else:
+            command = ["alo", "run", "--mode", "inference"]
+            result = subprocess.run(command, cwd=self.solution_dir)
+            logger.info(f"Return code: {result.returncode}")
+            if result.stdout:
+                logger.info(f"Output: {result.stdout.decode()}")
+            if result.stderr:
+                success = False
+                logger.Error(f"Error: {result.stderr.decode()}")
 
         return success
 
@@ -298,39 +309,50 @@ class Emulator:
 
         logger.info('upload_inference_result')
 
-        self.alo_dir = self.config[edge_utils.self.CONFIG_SOLUTION_DIR]
+        if self.alo_version == "v2":
+            output_folder = os.path.join(self.inference_artifact_dir, 'output')
+            score_folder = os.path.join(self.inference_artifact_dir, 'score')
+            score_path = os.path.join(score_folder, 'inference_summary.yaml')
 
-        inference_artifacts_folder = os.path.join(self.alo_dir, 'inference_artifacts')
-        output_folder = os.path.join(inference_artifacts_folder, 'output')
-        score_folder = os.path.join(inference_artifacts_folder, 'score')
-        score_path = os.path.join(score_folder, 'inference_summary.yaml')
+            if not os.path.exists(output_folder):
+                logger.error('output folder is not exist')
+                return
 
-        if not os.path.exists(output_folder):
-            logger.error('output folder is not exist')
-            return
+            score_yaml = edge_utils.load_yaml(score_path)
+            logger.info(score_yaml['note'])
 
-        score_yaml = edge_utils.load_yaml(score_path)
-        logger.info(score_yaml['note'])
+            zip_path = os.path.join(self.alo_dir, 'inference_artifacts.zip')
 
-        zip_path = os.path.join(self.alo_dir, 'inference_artifacts.zip')
+            edge_utils.zip_folder(self.inference_artifact_dir, zip_path)
+            tabular_path = edge_utils.find_tabular_file(output_folder)
+            if tabular_path is not None:
+                tabular_path = f"output/{tabular_path}"
 
-        edge_utils.zip_folder(inference_artifacts_folder, zip_path)
+            image_path = edge_utils.find_image_file(output_folder)
+            if image_path is not None:
+                tabular_path = f"output/{image_path}"
+        else:
+            zip_path = os.path.join(self.inference_artifact_dir, 'inference_artifacts.zip')
+            image_path, tabular_path, score_yaml = edge_utils.parse_inference_artifacts(zip_path)
 
-        CONFIG_MODEL_INFO = self.config[edge_utils.CONFIG_MODEL_INFO]
-        result_info = CONFIG_MODEL_INFO
+        logger.info(f"Image Path:{image_path}, Tabular Path:{tabular_path}, Score:{score_yaml}")
+
+        model_info = self.config[edge_utils.CONFIG_MODEL_INFO]
+        result_info = {}
+        result_info['model_seq'] = model_info['model_seq']
+        result_info['stream_name'] = model_info['stream_name']
         result_info['result'] = score_yaml['result']
         result_info['score'] = score_yaml['score']
         result_info['note'] = score_yaml['note']
+        result_info['input_file'] = self.input_name
 
-        tabular_path = edge_utils.find_tabular_file(output_folder)
         if tabular_path is not None:
-            result_info['tabular'] = f"output/{tabular_path}"
+            result_info['tabular'] = tabular_path
         else:
             result_info['tabular'] = None
 
-        image_path = edge_utils.find_image_file(output_folder)
         if image_path is not None:
-            result_info['non-tabular'] = f"output/{image_path}"
+            result_info['non-tabular'] = image_path
         else :
             result_info['non-tabular'] = None
 
@@ -339,6 +361,7 @@ class Emulator:
         if len(score_yaml['probability']) != 0:
            result_info["probability"] = score_yaml['probability']
 
+        logger.info(result_info)
         self.client.upload_inference_result(result_info, zip_path)
 
 if __name__ == '__main__' :

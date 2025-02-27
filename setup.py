@@ -15,7 +15,9 @@ setup(
         'loguru',
         'PyYAML',
         'psutil',
+        'ruamel.yaml'
         'nest_asyncio'
+
     ],
     description='Receives the inference model from Mellerikat on Edge and performs inference',
     author='Mellerikat',

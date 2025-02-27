@@ -35,32 +35,37 @@ class EdgeClient:
             "Authorization": f"Bearer {self.jwt_token}",
         }
 
-        async with websockets.connect(self.websocket_url, extra_headers=headers) as websocket:
-            self.websocket = websocket
-            logger.info('websocket connect')
+        self.websocket = await websockets.connect(self.websocket_url, extra_headers=headers)
+        logger.info('WebSocket connected')
+
+        asyncio.create_task(self._receive_messages())
+
+    async def _receive_messages(self):
+        try:
+            while True:
+                message = await self.websocket.recv()  # 메시지를 수신
+                logger.info(f"Received message: {message}")  # 메시지 처리, 지금은 로깅만
+        except websockets.ConnectionClosed:
+            logger.info("Connection closed")
 
     async def close_websocket(self):
         if self.websocket:
             try:
                 await self.websocket.close()
-                logger.info("websocket closed")
+                logger.info("WebSocket closed")
             except Exception as e:
                 logger.error(f"Failed to close websocket: {e}")
         else:
             logger.warning("No websocket connection to close")
 
     def connect(self):
-        asyncio.run(self.__connect())
-
-    async def __connect(self):
-        await self.connect_edgeconductor()
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(self.connect_edgeconductor())
 
     def disconnect(self):
-        try:
-            logger.info('disconnecting websocket')
-            asyncio.run(self.close_websocket())
-        except Exception as e:
-            logger.warning(f'websocket close failed: {e}')
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(self.close_websocket())
+
 
     def request_register(self, device_info):
         url = f"{self.url}/app/api/v1/edges"
@@ -260,6 +265,7 @@ class EdgeClient:
             "model_seq": result_info['model_seq'],
             "result": result_info['result'],
             "score": result_info['score'],
+            "input_file": result_info['input_file'],
             "date": current_time,
             "note": result_info['note'],
             "tabular": result_info['tabular'],
