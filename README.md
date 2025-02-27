@@ -25,6 +25,7 @@ Create a file named emulator_config.yaml at a location of your choice with the f
 
 ```yaml
 alo_dir: /home/user/projects/alo # ALO Path
+alo_version: v3
 edge_conductor_location: cloud # Environment of Edge Conductor (cloud or on-premise)
 edge_conductor_url: https://edgecond.try-mellerikat.com # URL of Edge Conductor (include https or http)
 edge_security_key: edge-emulator-{{user_id}}-{{number}} # Unique key to identify Edge, fill in {{ }} with appropriate values
