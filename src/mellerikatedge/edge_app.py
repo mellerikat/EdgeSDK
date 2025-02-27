@@ -45,20 +45,16 @@ class Emulator:
             self.inference_artifact_dir = os.path.join(self.alo_dir, 'inference_artifact')
             self.update_model_dir = self.train_artifact_dir
 
-        self.sdk_dir = os.path.join(self.solution_dir, "edge_sdk")
-        self.new_model_dir = os.path.join(self.sdk_dir, "model")
-        self.inference_data_dir = os.path.join(self.sdk_dir, "inference")
+        self.edge_dir = os.path.join(self.solution_dir, "mellerikatedge")
+        self.new_model_dir = os.path.join(self.edge_dir, "model")
+        self.inference_data_dir = os.path.join(self.edge_dir, "inference")
         self.plan_path = os.path.join(self.solution_dir, "experimental_plan.yaml")
         self.new_model_info = {}
 
         self.client = EdgeClient(self.config)
 
-
-
     def start(self):
         self.initialized = False
-
-        # edge_utils.self.CONFIG_SOLUTION_DIR = os.path.join(self.alo_dir, "solution")
 
         if not os.path.exists(self.alo_dir):
             logger.error(f"ALO {self.alo_dir} does not exist.")
@@ -72,8 +68,8 @@ class Emulator:
             logger.error(f"AI Solution {self.solution_dir} does not exist.")
             return
 
-        if not os.path.exists(self.sdk_dir):
-            os.makedirs(self.sdk_dir)
+        if not os.path.exists(self.edge_dir):
+            os.makedirs(self.edge_dir)
 
         if not os.path.exists(self.new_model_dir):
             os.makedirs(self.new_model_dir)

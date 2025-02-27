@@ -47,33 +47,6 @@ def save_yaml(path, yaml_data):
         # yaml.dump(yaml_data, file, default_flow_style=False)
         yaml.dump(yaml_data, file)
 
-# class OrderedLoader(yaml.SafeLoader):
-#     pass
-
-
-# def construct_ordered_map(loader, node):
-#     return OrderedDict(loader.construct_pairs(node))
-
-
-# OrderedLoader.add_constructor(
-#     yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, construct_ordered_map
-# )
-
-
-# # YAML 파일 로드: 순서 유지
-# def load_yaml(file_path):
-#     with open(file_path, "r", encoding="utf-8") as f:
-#         return yaml.load(f, Loader=OrderedLoader)
-
-
-# # YAML 파일 저장: 순서 유지
-# def save_yaml(file_path, data):
-#     with open(file_path, "w", encoding="utf-8") as f:
-#         yaml.dump(
-#             data, f, allow_unicode=True, default_flow_style=False, sort_keys=False
-#         )
-
-
 def load_json(file_path):
     with open(file_path, "r") as file:
         data = json.load(file)
