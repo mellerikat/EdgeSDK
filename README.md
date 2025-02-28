@@ -1,5 +1,5 @@
 ## Edge SDK (mellerikatedge)
-- Provides the ability to connect to the EdgeApp Emulator on the Edge Conductor, deploy the inference model, and execute it.
+- It emulates the operation of the Edge App, receives the model deployment from the Edge Conductor, and sends the inference results back to the Edge Conductor
 - Inference can be performed directly by handling DataFrame or files.
 - Can be customized and utilized to fit legacy environments.
 
@@ -8,23 +8,29 @@
 
 ## Environment Setup
 ### Setting Up and Running ALO and AI Solution
-1. Install ALO. ([ALO Installation Guide](https://mellerikat.com/user_guide/data_scientist_guide/alo/quick_run))
-2. Deploy the AI solution stream you want to use on Edge Conductor to ALO.
-3. Run ALO with a simple dataset to download the necessary assets and install Python modules.
+1. Install ALO. ([ALO Installation Guide](https://mellerikat.com/user_guide/data_scientist_guide/alo/alo-v3/quick_run))
+2. Develop AI Solution to solve the problem.
+3. Register the AI Solution in the AI Conductor and train the model in the Edge Conductor.
 
-### Installing Edge SDK
-Download and install the `mellerikatedge whl` file from the `dist` folder.
-
+### Install Edge SDK
 ```sh
-wget https://github.com/mellerikat/EdgeSDK/raw/refs/heads/v1.0.0/dist/mellerikatedge-1.0-py3-none-any.whl
-pip install mellerikatedge-1.0-py3-none-any.whl
+pip install mellerikatedge
 ```
 
-### Creating a Configuration File for Edge SDK
-Create a file named emulator_config.yaml at a location of your choice with the following content:
+
+## Quick Run
+
+### Creating a Configuration
+Create a configuration file for the Edge SDK in the AI Solution folder. It requires information about the Edge Conductor and a serial name to distinguish the Edge.
+```bash
+cd {AI Solution folder}
+edge init
+```
+
+If it operates correctly, the edge_config.yaml file will be created.
 
 ```yaml
-alo_dir: /home/user/projects/alo # ALO Path
+solution_dir: /home/user/projects/ai_solution # ALO Path
 alo_version: v3
 edge_conductor_location: cloud # Environment of Edge Conductor (cloud or on-premise)
 edge_conductor_url: https://edgecond.try-mellerikat.com # URL of Edge Conductor (include https or http)
@@ -36,11 +42,20 @@ model_info: # Will be filled in when the SDK runs and the model is deployed
 
 ```
 
+### One-time Inference
+A one-time inference can be executed using the edge inference command in the command line. This command connects to the Edge Conductor to retrieve the inference model, updates the meat information and input file information in the experimental_plan, updates the model information in the train_artifact, and then executes the ALO.
+
+```bash
+edge inference --input {input file path}
+```
+
 ## Example of Using Edge App Emulator
+To utilize the connection with the Edge Conductor in various ways, similar to the Edge App, you can write the script as follows.
+
 ```python
     import mellerikatedge.edgeapp as edgeapp
 
-    emulator = edgeapp.Emulator('emulator_config.yaml path')
+    emulator = edgeapp.Emulator('edge_config.yaml path')
     try :
         emulator.start()
         if emulator.deploy_model():

@@ -5,22 +5,29 @@ import re
 from mellerikatedge.edge_app import Emulator
 import mellerikatedge.edge_utils as edge_utils
 
-def validate_input(prompt, pattern, error_message):
-    while True:
-        user_input = input(prompt)
-        if re.match(pattern, user_input):
-            return user_input
-        else:
-            print(error_message)
+CONFIG_FILE_NAME = 'edge_config.yaml'
 
 def edge_inference(input_file):
     if not os.path.isfile(input_file):
         print(f"Error: The file '{input_file}' does not exist.")
         return
-    print(f"Performing edge inference on input file: {input_file}")
+
+    if not os.path.exists(CONFIG_FILE_NAME):
+        print(f"Error: The file '{CONFIG_FILE_NAME}' does not exist. Do the 'edge init' first.")
+        return
+
+    emulator = Emulator(CONFIG_FILE_NAME)
+    emulator.start(onetime_run=True)
+    if emulator.deploy_model():
+        if emulator.inference_file(input_file):
+            emulator.upload_inference_result()
+        else:
+            print("inference fail")
+    else:
+        print(f"Performing edge inference on input file: {input_file}")
 
 
-def edge_init():
+def edge_init(args):
     current_directory = os.getcwd()
     print(current_directory)
 
@@ -47,6 +54,14 @@ def edge_init():
     if alo_version is None:
         print("Please run init in the folder where ALO is executed.")
         return
+
+    def validate_input(prompt, pattern, error_message):
+        while True:
+            user_input = input(prompt)
+            if re.match(pattern, user_input):
+                return user_input
+            else:
+                print(error_message)
 
     edge_serial_name = validate_input(
         "Enter Edge Serial Name (alphanumeric and dashes only): ",
@@ -84,13 +99,20 @@ def edge_init():
         'model_info' : model_info
     }
 
-    edge_utils.save_yaml('edge_config.yaml', config_data)
+    edge_utils.save_yaml(CONFIG_FILE_NAME, config_data)
 
-    print(f"Configuration file 'edge_config.yaml' created with the following details:")
+    print(f"Configuration file {CONFIG_FILE_NAME} created with the following details:")
     print(f"Edge Serial Name: {edge_serial_name}")
     print(f"Edge Conductor URL: {edge_conductor_url}")
     print(f"Edge Conductor Installation Location: {'cloud' if edge_conductor_location == '1' else 'on-premise'}")
-    print("Please connect to Edge Conductor and register the Edge.")
+
+    emulator = Emulator(CONFIG_FILE_NAME)
+    exist_edge = emulator.start(onetime_run=True)
+    if exist_edge:
+        print("This Edge is already registered. Change the Serial Name if you want to use a different Edge.")
+    else:
+        print("Connect to Edge Conductor and make sure to register the Edge.")
+
 
 def main():
     parser = argparse.ArgumentParser(description="Mellerikat Edge CLI")

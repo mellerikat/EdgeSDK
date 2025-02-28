@@ -56,9 +56,11 @@ class EdgeClient:
             except Exception as e:
                 logger.error(f"Failed to close websocket: {e}")
         else:
-            logger.warning("No websocket connection to close")
+            if self.triedConnection:
+                logger.warning("No websocket connection to close")
 
     def connect(self):
+        self.triedConnection = True
         loop = asyncio.get_event_loop()
         loop.run_until_complete(self.connect_edgeconductor())
 
@@ -156,7 +158,7 @@ class EdgeClient:
             logger.info(f"Deploy Model: {deploy_model}")
             logger.info(f"Update Edge Docker: {update_docker}")
 
-            return deployed_info, deploy_model
+            return edge_details#deployed_info, deploy_model
 
         else:
             logger.error("GET Failed!")

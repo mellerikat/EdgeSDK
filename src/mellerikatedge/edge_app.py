@@ -53,7 +53,7 @@ class Emulator:
 
         self.client = EdgeClient(self.config)
 
-    def start(self):
+    def start(self, onetime_run=False):
         self.initialized = False
 
         if not os.path.exists(self.alo_dir):
@@ -78,13 +78,21 @@ class Emulator:
             os.makedirs(self.inference_data_dir)
 
         if self.client.authenticate():
-            self.client.connect()
+            if onetime_run == False:
+                logger.info("onetime run")
+                self.client.connect()
 
-            deployed_info, deploy_model = self.client.read_info()
+            edge_details = self.client.read_info()
+            deployed_info = edge_details.get("deployed_info", {})
+            deploy_model = edge_details.get("deploy_model", {})
+
+            if edge_details.get('edge_state') == 'requested':
+                logger.error("Register the Edge with Edge Conductor.")
+                return False
 
             if deployed_info is None and deploy_model is None:
-                logger.error("First, deploy the model on Edge Conductor.")
-                return
+                logger.error("Deploy the model on Edge Conductor.")
+                return False
 
             # if deployed_info is not None and 'model_seq' not in self.config.get(edge_utils.CONFIG_MODEL_INFO, {}):
             #     logger.error("The model information is incorrect. Deploy the model again")
@@ -109,10 +117,12 @@ class Emulator:
                     self.download_new_model = False
 
             self.initialized = True
+            return True
         else:
             device_info = edge_utils.get_device_info()
             logger.info(device_info)
             self.client.request_register(device_info)
+            return False
 
     def stop(self):
         self.client.disconnect()
