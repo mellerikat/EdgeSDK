@@ -1,9 +1,17 @@
 # setup.py
+import os
 from setuptools import setup, find_packages
 
+def read_version():
+    version_file = os.path.join(os.path.dirname(__file__), "src/mellerikatedge/version.py")
+    with open(version_file) as f:
+        code = compile(f.read(), version_file, 'exec')
+        exec(code)
+        return locals()['__version__']
+
 setup(
-    name='mellerikatedge',
-    version='1.1',
+    name='mellerikat-edge',
+    version=read_version(),
     packages=find_packages(where='src'),
     package_dir={"": "src"},
     install_requires=[

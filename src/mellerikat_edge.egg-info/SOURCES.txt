@@ -1,0 +1,15 @@
+LICENSE
+README.md
+setup.py
+src/mellerikat_edge.egg-info/PKG-INFO
+src/mellerikat_edge.egg-info/SOURCES.txt
+src/mellerikat_edge.egg-info/dependency_links.txt
+src/mellerikat_edge.egg-info/entry_points.txt
+src/mellerikat_edge.egg-info/requires.txt
+src/mellerikat_edge.egg-info/top_level.txt
+src/mellerikatedge/__init__.py
+src/mellerikatedge/cli.py
+src/mellerikatedge/edge_app.py
+src/mellerikatedge/edge_client.py
+src/mellerikatedge/edge_utils.py
+src/mellerikatedge/version.py

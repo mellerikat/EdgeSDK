@@ -1,0 +1,7 @@
+requests
+websockets==10.4
+pandas
+loguru
+psutil
+ruamel.yaml
+nest_asyncio

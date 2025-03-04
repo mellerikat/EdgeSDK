@@ -1,0 +1,20 @@
+Metadata-Version: 2.2
+Name: mellerikat-edge
+Version: 1.0.0
+Summary: Receives the inference model from Mellerikat on Edge and performs inference
+Home-page: https://github.com/mellerikat/EdgeSDK
+Author: Mellerikat
+Author-email: contact@mellerikat.com
+License-File: LICENSE
+Requires-Dist: requests
+Requires-Dist: websockets==10.4
+Requires-Dist: pandas
+Requires-Dist: loguru
+Requires-Dist: psutil
+Requires-Dist: ruamel.yaml
+Requires-Dist: nest_asyncio
+Dynamic: author
+Dynamic: author-email
+Dynamic: home-page
+Dynamic: requires-dist
+Dynamic: summary

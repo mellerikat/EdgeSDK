@@ -1,5 +1,6 @@
 import os
 import requests
+from .version import __version__
 import mellerikatedge.edge_utils as edge_utils
 
 import json
@@ -7,9 +8,12 @@ import asyncio
 import nest_asyncio
 import websockets
 
+import threading
+
 from datetime import datetime, timezone
 
 from loguru import logger
+
 
 class EdgeClient:
     url = None
@@ -17,7 +21,8 @@ class EdgeClient:
     jwt_token = None
     websocket = None
 
-    def __init__(self, config):
+    def __init__(self, edge_app, config):
+        self.edge_app = edge_app
         nest_asyncio.apply()
 
         self.url = edge_utils.remove_trailing_slash(config[edge_utils.CONFIG_EDGE_COND_URL])
@@ -27,24 +32,40 @@ class EdgeClient:
         else:
             self.websocket_url = f"ws://{edge_utils.remove_http_https(self.url)}/app/api/v1/socket/{self.security_key}"
 
+
         self.websocket = None
-        logger.info(self.websocket_url)
+        self.loop = asyncio.new_event_loop()
+        self.thread = None
+        self._stop_event = asyncio.Event()  # 종료 신호 추가
+        logger.info(f"WebSocket URL: {self.websocket_url}")
 
     async def connect_edgeconductor(self):
-        headers = {
-            "Authorization": f"Bearer {self.jwt_token}",
-        }
+        headers = {"Authorization": f"Bearer {self.jwt_token}"}
+        while not self._stop_event.is_set():  # 종료 신호 확인
+            try:
+                self.websocket = await websockets.connect(self.websocket_url, extra_headers=headers)
+                logger.info('WebSocket connected')
+                asyncio.create_task(self._receive_messages())
+                asyncio.create_task(self._keep_alive())
+                await self._stop_event.wait()  # 종료 신호를 기다림
+            except websockets.ConnectionClosed:
+                logger.warning("Connection closed, reconnecting in 2 seconds...")
+                await asyncio.sleep(2)
 
-        self.websocket = await websockets.connect(self.websocket_url, extra_headers=headers)
-        logger.info('WebSocket connected')
-
-        asyncio.create_task(self._receive_messages())
+    async def _keep_alive(self):
+        while not self._stop_event.is_set():
+            await asyncio.sleep(5)
+            await self.websocket.ping()
 
     async def _receive_messages(self):
         try:
-            while True:
-                message = await self.websocket.recv()  # 메시지를 수신
-                logger.info(f"Received message: {message}")  # 메시지 처리, 지금은 로깅만
+            while not self._stop_event.is_set():
+                message = await self.websocket.recv()
+                logger.info(f"Received message: {message}")
+                message_dict = json.loads(message)
+                if "deploy_model" in message_dict:
+                    deploy_model = message_dict["deploy_model"]
+                    self.edge_app.receive_deploy_model(deploy_model)
         except websockets.ConnectionClosed:
             logger.info("Connection closed")
 
@@ -55,19 +76,32 @@ class EdgeClient:
                 logger.info("WebSocket closed")
             except Exception as e:
                 logger.error(f"Failed to close websocket: {e}")
-        else:
-            if self.triedConnection:
-                logger.warning("No websocket connection to close")
+        self.websocket = None
+
+    def run_loop(self):
+        asyncio.set_event_loop(self.loop)
+        self.loop.run_until_complete(self.connect_edgeconductor())
+        self.loop.run_until_complete(self.close_websocket())
+        self.loop.stop()
+        self.loop.close()
 
     def connect(self):
         self.triedConnection = True
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(self.connect_edgeconductor())
+        if self.thread is None or not self.thread.is_alive():
+            self.thread = threading.Thread(target=self.run_loop, daemon=True)
+            self.thread.start()
+            logger.info("WebSocket thread started")
 
     def disconnect(self):
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(self.close_websocket())
+        if self.loop.is_running():
+            self.loop.call_soon_threadsafe(self._stop_event.set)
+            self.loop.call_soon_threadsafe(lambda: asyncio.ensure_future(self.close_websocket(), loop=self.loop))
 
+            if self.thread:
+                self.thread.join(timeout=5)
+                if self.thread.is_alive():
+                    logger.warning("WebSocket thread did not terminate gracefully")
+            logger.info("WebSocket thread stopped")
 
     def request_register(self, device_info):
         url = f"{self.url}/app/api/v1/edges"
@@ -103,7 +137,7 @@ class EdgeClient:
         headers = {
             "device_up_time": "12345",
             "app_installed_time": "1609459200",
-            "app_version": "1.0.0",
+            "app_version": f"{__version__}-sdk",
             "app_up_time": "3600",
             "config_input_path": "/path/to/input",
             "config_output_path": "/path/to/output"
@@ -187,7 +221,7 @@ class EdgeClient:
             with open(file_path, 'wb') as file:
                 for chunk in response.iter_content(chunk_size=8192):
                     file.write(chunk)
-            logger.info(f"{file_name} downloaded successfully.")
+            logger.info(f"{file_name} downloaded successfully. {file_path}")
         else:
             logger.error("Failed to download the file:", response.status_code, response.text)
 
@@ -204,9 +238,10 @@ class EdgeClient:
         if response.status_code == 200:
             metadata = response.json()
             file_path = os.path.join(download_dir, 'meta.json')
+            logger.info(f"metadata")
             with open(file_path, 'w') as file:
                 json.dump(metadata, file, indent=2)
-            logger.info(f"meta.json downloaded successfully.")
+            logger.info(f"meta.json downloaded successfully. {file_path}")
         else:
             logger.error("Failed to download the file:", response.status_code, response.text)
 

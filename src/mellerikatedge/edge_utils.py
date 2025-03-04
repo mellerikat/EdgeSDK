@@ -184,7 +184,7 @@ def extract_selected_user_parameters(data):
     return train_selected_user_parameters, inference_selected_user_parameters
 
 
-def update_pipeline(pipeline, selected_parameters):
+def update_pipeline_v2(pipeline, selected_parameters):
     for selected in selected_parameters:
         step_to_find = selected["step"]
         for step in pipeline:
@@ -195,6 +195,19 @@ def update_pipeline(pipeline, selected_parameters):
                     if selected["args"]:
                         step["args"].update(selected["args"])
     return pipeline
+
+
+def update_pipeline_v3(pipeline, selected_parameters):
+    for parameter in selected_parameters:
+        step = parameter['step']
+        args = parameter.get('args', {})
+        if step in pipeline:
+            if 'argument' in pipeline[step]:
+                pipeline[step]['argument'].update(args)
+            else:
+                pipeline[step]['argument'] = args
+    return pipeline
+
 
 def parse_inference_artifacts(path):
     image_path = None

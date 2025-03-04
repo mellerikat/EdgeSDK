@@ -17,7 +17,7 @@ The Edge SDK emulates the functionality of the Edge App, enabling seamless integ
 ### Install Edge SDK
 
 ```sh
-pip install mellerikatedge
+pip install mellerikat-edge
 ```
 
 ---

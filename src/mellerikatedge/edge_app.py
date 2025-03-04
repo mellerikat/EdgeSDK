@@ -51,7 +51,7 @@ class Emulator:
         self.plan_path = os.path.join(self.solution_dir, "experimental_plan.yaml")
         self.new_model_info = {}
 
-        self.client = EdgeClient(self.config)
+        self.client = EdgeClient(self, self.config)
 
     def start(self, onetime_run=False):
         self.initialized = False
@@ -127,6 +127,12 @@ class Emulator:
     def stop(self):
         self.client.disconnect()
 
+    def receive_deploy_model(self, deploy_model):
+        logger.info('Receive deploy model message')
+        self.new_model_info = copy.deepcopy(deploy_model)
+        self.download_new_model = True
+        self.deploy_model()
+
     def deploy_model(self):
         if self.initialized is not True:
             logger.warning('Not initialized')
@@ -184,25 +190,28 @@ class Emulator:
                     initialized = False
                     return False
 
+                metadata_json = edge_utils.load_json(metadata_path)
+                logger.info("extract user parameter")
+                selected_train_parameter, selected_inference_parameter = edge_utils.extract_selected_user_parameters(metadata_json)
+
+                plan_path = os.path.join(self.solution_dir, 'experimental_plan.yaml')
+                plan_yaml = edge_utils.load_yaml(plan_path)
+
+                logger.info("update inference parameter")
                 if self.alo_version == "v2":
-                    metadata_json = edge_utils.load_json(metadata_path)
-                    logger.info("extract user parameter")
-                    selected_train_parameter, selected_inference_parameter = edge_utils.extract_selected_user_parameters(metadata_json)
-
-                    plan_path = os.path.join(self.solution_dir, 'experimental_plan.yaml')
-                    plan_yaml = edge_utils.load_yaml(plan_path)
-
-                    logger.info("update inference parameter")
                     inference_pipeline = plan_yaml['user_parameters'][1]['inference_pipeline']
                     print(inference_pipeline)
                     print(selected_inference_parameter)
-                    updated_inference_pipeline = edge_utils.update_pipeline(inference_pipeline, selected_inference_parameter)
+                    updated_inference_pipeline = edge_utils.update_pipeline_v2(inference_pipeline, selected_inference_parameter)
                     plan_yaml['user_parameters'][1]['inference_pipeline'] = updated_inference_pipeline
-
-                    logger.info("save plan yaml")
                     edge_utils.save_yaml(plan_path, plan_yaml)
                 else:
                     logger.info("meta v3")
+                    logger.info(f"{selected_inference_parameter}")
+                    plan_yaml['solution']['function'] = edge_utils.update_pipeline_v3(plan_yaml['solution']['function'], selected_inference_parameter)
+                    logger.info(f"{plan_yaml['solution']['function']}")
+                    edge_utils.save_yaml(plan_path, plan_yaml)
+
             except Exception as e:
                 logger.error(f"Update metadata error: {e}")
                 logger.error("Please confirm if the version of AI Solution code is the same.")
