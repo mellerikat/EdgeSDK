@@ -60,6 +60,7 @@ Simply perform inference with 'edge inference'.
 2. Modify the model in train_artifact and apply the parameters set in experimental_plan.
 3. Run ALO.
 4. Send inference_artifacts to Edge Conductor.
+
 **__Note__**: 'edge inference' will not be marked as connected in Edge Conductor.
 
 ```bash
