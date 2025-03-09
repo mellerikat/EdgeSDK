@@ -1,4 +1,4 @@
-# Edge SDK (mellerikatedge)
+# Edge SDK (mellerikat-edge)
 
 The Edge SDK emulates the functionality of the Edge App, enabling seamless integration with the Edge Conductor. It receives model deployments from the Edge Conductor and sends inference results back, supporting both DataFrame and file-based inference. The SDK is highly customizable, making it adaptable to legacy environments.
 
@@ -54,13 +54,14 @@ model_info:                                    # Populated when the SDK runs and
 
 ### One-Time Inference
 
-Simply perform inference with 'edge inference'. Follow these steps:
-
-Download the model deployed by Edge Conductor.
-Modify the model in train_artifact and apply the parameters set in experimental_plan.
-Run ALO.
-Send inference_artifacts to Edge Conductor.
+Simply perform inference with 'edge inference'.
+"edge inference" performs the following steps.
+1. Download the model deployed by Edge Conductor.
+2. Modify the model in train_artifact and apply the parameters set in experimental_plan.
+3. Run ALO.
+4. Send inference_artifacts to Edge Conductor.
 **__Note__**: 'edge inference' will not be marked as connected in Edge Conductor.
+
 ```bash
 edge inference --input {input_file_path}
 ```
