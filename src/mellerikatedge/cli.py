@@ -1,6 +1,7 @@
 import os
 import argparse
 import re
+import time
 
 from mellerikatedge.edge_app import Emulator
 import mellerikatedge.edge_utils as edge_utils
@@ -17,14 +18,19 @@ def edge_inference(input_file):
         return
 
     emulator = Emulator(CONFIG_FILE_NAME)
-    emulator.start(onetime_run=True)
-    if emulator.deploy_model():
-        if emulator.inference_file(input_file):
-            emulator.upload_inference_result()
+    emulator.init()
+    status = emulator.start(onetime_run=True)
+    print(f"Emulator Status : {status}")
+    if status == Emulator.STATUS_INFERENCE_READY:
+        if emulator.inference_file("/home/gyulim.gu/projects/edge_sdk_test/inference_dataset_sdk.csv"):
+            if emulator.upload_inference_result():
+                print(f"Inference and upload successful for '{input_file}'.")
+            else:
+                print(f"Inference result upload failed. Please check the logs.")
         else:
-            print("inference fail")
+            print("Inference failed. The solution of the deployed model must match the solution set in mellerikat-edge.")
     else:
-        print(f"Performing edge inference on input file: {input_file}")
+        print("Failed to start Edge Emulator. Please check the logs.")
 
 
 def edge_init(args):
@@ -55,48 +61,55 @@ def edge_init(args):
         print("Please run init in the folder where ALO is executed.")
         return
 
-    def validate_input(prompt, pattern, error_message):
+    def validate_input(prompt, pattern, default_value, error_message):
         while True:
-            user_input = input(prompt)
+            user_input = input(prompt).strip()
+            if user_input == "":
+                return default_value
             if re.match(pattern, user_input):
                 return user_input
             else:
                 print(error_message)
 
+
+    timestamp = int(time.time())
+    default_serial_name = f"edge-sdk-{timestamp}"
     edge_serial_name = validate_input(
-        "Enter Edge Serial Name (alphanumeric and dashes only): ",
+        "Enter Edge Serial Name (alphanumeric and dashes only, press Enter for auto-generated 'edge-sdk-[timestamp]'): ",
         r'^[a-zA-Z0-9\-]+$',
+        default_serial_name,
         "Edge Serial Name must contain only alphanumeric characters and dashes."
     )
 
-    # Edge Conductor 주소 입력 받기 (http 또는 https로 시작)
+    default_url = "https://edgecond.try-mellerikat.com"
     edge_conductor_url = validate_input(
-        "Enter Edge Conductor Address (e.g., https://edgecond.try-mellerikat.com): ",
+        f"Enter Edge Conductor Address (press Enter for default '{default_url}'): ",
         r'^(http|https)://[^\s]+$',
+        default_url,
         "Edge Conductor Address must be a valid URL starting with http or https."
     )
 
-    # Edge Conductor 설치 위치 입력 받기 (1 또는 2만 허용)
+    default_location = "1"
     edge_conductor_location = validate_input(
-        "Enter Edge Conductor Installation Location (1 for Cloud, 2 for On-premise): ",
+        "Enter Edge Conductor Installation Location (press Enter for default '1' (Cloud), or enter '2' for On-premise): ",
         r'^[12]$',
+        default_location,
         "Installation Location must be 1 (Cloud) or 2 (On-premise)."
     )
 
     model_info = {
-        'model_seq' : None,
-        'model_version' : None,
-        'stream_name' : None
+        'model_seq': None,
+        'model_version': None,
+        'stream_name': None
     }
 
-    # 데이터 저장
     config_data = {
-        'solution_dir' : current_directory,
-        'alo_version' : alo_version,
+        'solution_dir': current_directory,
+        'alo_version': alo_version,
         'edge_security_key': edge_serial_name,
         'edge_conductor_url': edge_conductor_url,
         'edge_conductor_location': "cloud" if edge_conductor_location == '1' else "on-premise",
-        'model_info' : model_info
+        'model_info': model_info
     }
 
     edge_utils.save_yaml(CONFIG_FILE_NAME, config_data)
@@ -107,7 +120,7 @@ def edge_init(args):
     print(f"Edge Conductor Installation Location: {'cloud' if edge_conductor_location == '1' else 'on-premise'}")
 
     emulator = Emulator(CONFIG_FILE_NAME)
-    exist_edge = emulator.start(onetime_run=True)
+    exist_edge = emulator.init()
     if exist_edge:
         print("This Edge is already registered. Change the Serial Name if you want to use a different Edge.")
     else:
@@ -118,12 +131,10 @@ def main():
     parser = argparse.ArgumentParser(description="Mellerikat Edge CLI")
     subparsers = parser.add_subparsers(dest="command")
 
-    # inference 서브 커맨드
     parser_inference = subparsers.add_parser("inference", help="Deploy the model from Edge Conductor and perform inference.")
     parser_inference.add_argument('--input', type=str, required=True, help="Input file path for inference")
     parser_inference.set_defaults(func=lambda args: edge_inference(args.input))
 
-    # init 서브 커맨드
     parser_init = subparsers.add_parser("init", help="Initialize edge environment")
     parser_init.set_defaults(func=edge_init)
 
@@ -132,6 +143,7 @@ def main():
         args.func(args)
     else:
         parser.print_help()
+
 
 if __name__ == "__main__":
     main()

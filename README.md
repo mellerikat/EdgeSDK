@@ -26,7 +26,12 @@ pip install mellerikat-edge
 
 ### Creating a Configuration
 
-Generate a configuration file for the Edge SDK in your AI Solution folder. This file requires details about the Edge Conductor and a unique serial name to identify the Edge instance.
+Create the Configuration file and prepare to use it on Edge Conductor.
+
+1. Navigate to the AI Solution folder.
+2. Execute edge init to create a Configuration file.
+3. Based on the Configuration information, register the Edge App with Edge Conductor.
+4. After running edge init, proceed to register the Edge App with Edge Conductor and deploy the model.
 
 ```bash
 cd {AI_Solution_folder}
@@ -49,8 +54,13 @@ model_info:                                    # Populated when the SDK runs and
 
 ### One-Time Inference
 
-Perform a one-time inference using the `edge inference` command. This connects to the Edge Conductor, retrieves the inference model, updates metadata in the `experimental_plan` and `train_artifact`, and executes ALO.
+Simply perform inference with 'edge inference'. Follow these steps:
 
+Download the model deployed by Edge Conductor.
+Modify the model in train_artifact and apply the parameters set in experimental_plan.
+Run ALO.
+Send inference_artifacts to Edge Conductor.
+**__Note__**: 'edge inference' will not be marked as connected in Edge Conductor.
 ```bash
 edge inference --input {input_file_path}
 ```
@@ -62,22 +72,58 @@ edge inference --input {input_file_path}
 To interact with the Edge Conductor in a manner similar to the Edge App, you can use the following Python script:
 
 ```python
-import mellerikatedge.edgeapp as edgeapp
+import mellerikatedge.edge_app as edge_app
 
-emulator = edgeapp.Emulator('edge_config.yaml')
+emulator = edge_app.Emulator('edge_config.yaml')
+
+#========================== SDK Edge App ============================#
+# Edge App registration requested.                                   #
+#====================================================================#
+emulator.init()
+
+#========================== Edge Conductor ==========================#
+# Register SDK Edge App                                              #
+# Deploy Model #1 to SDK Edge App.                                   #
+#====================================================================#
+
 try:
-    emulator.start()
-    if emulator.deploy_model():
-        # Inference with a file
+    #========================== SDK Edge App ============================#
+    # Download Model #1 and connect it to Edge Conductor via Websocket.  #
+    #====================================================================#
+    status = emulator.start()
+    print("status", status)
+
+    if status == edge_app.Emulator.STATUS_INFERENCE_READY:
+        # Inference with a file (Model #1)
         if emulator.inference_file("file_path"):
             emulator.upload_inference_result()
 
-        # Inference with a DataFrame
+        # Inference with a DataFrame (Model #1)
+        if emulator.inference_dataframe(dataframe):
+            emulator.upload_inference_result()
+
+        #========================== Edge Conductor ==========================#
+        # Deploy Model #2 to SDK Edge App.                                   #
+        #====================================================================#
+
+        #========================== SDK Edge App ============================#
+        # Automatically received deployment of Model #2                      #
+        #====================================================================#
+
+        # Inference with a file (Model #2)
+        if emulator.inference_file("file_path"):
+            emulator.upload_inference_result()
+
+        # Inference with a DataFrame (Model #2)
         if emulator.inference_dataframe(dataframe):
             emulator.upload_inference_result()
 
 finally:
+    #========================== SDK Edge App ============================#
+    # Disconnect websocket                                               #
+    #====================================================================#
     emulator.stop()
+
 ```
 
 ---

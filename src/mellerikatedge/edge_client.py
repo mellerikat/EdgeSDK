@@ -1,7 +1,8 @@
 import os
 import requests
-from .version import __version__
 import mellerikatedge.edge_utils as edge_utils
+
+from mellerikatedge.edge_config import EdgeConfig
 
 import json
 import asyncio
@@ -14,6 +15,7 @@ from datetime import datetime, timezone
 
 from loguru import logger
 
+from mellerikatedge.version import __version__
 
 class EdgeClient:
     url = None
@@ -25,29 +27,29 @@ class EdgeClient:
         self.edge_app = edge_app
         nest_asyncio.apply()
 
-        self.url = edge_utils.remove_trailing_slash(config[edge_utils.CONFIG_EDGE_COND_URL])
-        self.security_key = config[edge_utils.CONFIG_EDGE_SECURITY_KEY]
-        if config[edge_utils.CONFIG_EDGE_COND_LOCATION] == edge_utils.CONFIG_EDGE_COND_LOCATION_CLOUD:
+        self.url = edge_utils.remove_trailing_slash(config.get_config(EdgeConfig.EDGECOND_URL))
+        self.security_key = config.get_config(EdgeConfig.SECURITY_KEY)
+        if config.get_config(EdgeConfig.EDGECOND_LOCATION) == EdgeConfig.EDGECOND_LOCATION_CLOUD:
             self.websocket_url = f"wss://{edge_utils.remove_http_https(self.url)}/app/api/v1/socket/{self.security_key}"
         else:
             self.websocket_url = f"ws://{edge_utils.remove_http_https(self.url)}/app/api/v1/socket/{self.security_key}"
 
-
         self.websocket = None
         self.loop = asyncio.new_event_loop()
         self.thread = None
-        self._stop_event = asyncio.Event()  # 종료 신호 추가
+        self._stop_event = asyncio.Event()
         logger.info(f"WebSocket URL: {self.websocket_url}")
+
 
     async def connect_edgeconductor(self):
         headers = {"Authorization": f"Bearer {self.jwt_token}"}
-        while not self._stop_event.is_set():  # 종료 신호 확인
+        while not self._stop_event.is_set():
             try:
                 self.websocket = await websockets.connect(self.websocket_url, extra_headers=headers)
                 logger.info('WebSocket connected')
                 asyncio.create_task(self._receive_messages())
                 asyncio.create_task(self._keep_alive())
-                await self._stop_event.wait()  # 종료 신호를 기다림
+                await self._stop_event.wait()
             except websockets.ConnectionClosed:
                 logger.warning("Connection closed, reconnecting in 2 seconds...")
                 await asyncio.sleep(2)
@@ -65,7 +67,7 @@ class EdgeClient:
                 message_dict = json.loads(message)
                 if "deploy_model" in message_dict:
                     deploy_model = message_dict["deploy_model"]
-                    self.edge_app.receive_deploy_model(deploy_model)
+                    self.edge_app._receive_deploy_model_message(deploy_model)
         except websockets.ConnectionClosed:
             logger.info("Connection closed")
 
@@ -86,11 +88,13 @@ class EdgeClient:
         self.loop.close()
 
     def connect(self):
-        self.triedConnection = True
-        if self.thread is None or not self.thread.is_alive():
-            self.thread = threading.Thread(target=self.run_loop, daemon=True)
-            self.thread.start()
-            logger.info("WebSocket thread started")
+        if self.websocket is None:
+            if self.thread is None or not self.thread.is_alive():
+                self.thread = threading.Thread(target=self.run_loop, daemon=True)
+                self.thread.start()
+                logger.info("WebSocket thread started")
+        else:
+            logger.debug("Already connected")
 
     def disconnect(self):
         if self.loop.is_running():
@@ -108,7 +112,7 @@ class EdgeClient:
 
         data = {
             "edge_id": self.security_key,
-            "note": "Edge SDK",
+            "note": "edge sdk",
             "security_key": self.security_key,
             "device_mac": device_info["device_mac"],
             "device_os": device_info["device_os"],
@@ -118,7 +122,7 @@ class EdgeClient:
 
         response = requests.post(url, json=data)
 
-        # 응답 확인
+
         if response.status_code == 201:
             logger.info("Success!")
             logger.info("Response JSON:", response.json())
@@ -130,6 +134,9 @@ class EdgeClient:
             logger.info("Status Code:", response.status_code)
             logger.info("Response:", response.text)
         return False
+
+    def check_authenticate(self):
+        return self.jwt_token != None
 
     def authenticate(self):
         url = f"{self.url}/app/api/v1/auth/authenticate"
@@ -192,11 +199,10 @@ class EdgeClient:
             logger.info(f"Deploy Model: {deploy_model}")
             logger.info(f"Update Edge Docker: {update_docker}")
 
-            return edge_details#deployed_info, deploy_model
-
+            return edge_details
         else:
             logger.error("GET Failed!")
-            return None, None
+            return None
 
     def download_model(self, model_seq, download_dir):
         url = f"{self.url}/app/api/v1/models/{model_seq}/model-file"
@@ -213,15 +219,13 @@ class EdgeClient:
                 file_name = content_disposition.split('filename=')[-1].strip().strip("\"'")
             else:
                 logger.warning("Content-Disposition header is missing.")
-                file_name = f"model.tar.gz"  # 기본 파일명 생성
+                file_name = f"model.tar.gz"
 
-            # logger.info(response.headers.get('Content-Disposition'))
-            # file_name = response.headers.get('Content-Disposition').split('filename=')[-1]
             file_path = os.path.join(download_dir, 'model.tar.gz')
             with open(file_path, 'wb') as file:
                 for chunk in response.iter_content(chunk_size=8192):
                     file.write(chunk)
-            logger.info(f"{file_name} downloaded successfully. {file_path}")
+            logger.info(f"{file_name} downloaded successfully.")
         else:
             logger.error("Failed to download the file:", response.status_code, response.text)
 
@@ -238,10 +242,9 @@ class EdgeClient:
         if response.status_code == 200:
             metadata = response.json()
             file_path = os.path.join(download_dir, 'meta.json')
-            logger.info(f"metadata")
             with open(file_path, 'w') as file:
                 json.dump(metadata, file, indent=2)
-            logger.info(f"meta.json downloaded successfully. {file_path}")
+            logger.info(f"meta.json downloaded successfully.")
         else:
             logger.error("Failed to download the file:", response.status_code, response.text)
 
@@ -284,8 +287,10 @@ class EdgeClient:
         if response.status_code == 200:
             logger.info("Successfully updated inference status.")
             logger.info("Response:", response.json())
+            return True
         else:
             logger.error("Failed to update inference status:", response.status_code, response.text)
+            return False
 
     def upload_inference_result(self, result_info, zip_path):
         url = f"{self.url}/app/api/v1/inference/file"
@@ -319,12 +324,13 @@ class EdgeClient:
             "file": open(zip_path, "rb")
         }
 
-        # POST 요청 전송
         response = requests.post(url, headers=headers, files=files)
-        if response.status_code == 201:
-            logger.info("Successfully updated deploy result.")
-        else:
-            logger.error("Failed to update deploy result:", response.status_code, response.text)
-
-        # 열려 있는 파일 객체를 닫기
         files["file"].close()
+
+        if response.status_code == 201:
+            logger.info("Successfully upload inference result.")
+            return True
+        else:
+            logger.error("Failed to upload inference result:", response.status_code, response.text)
+            return False
+

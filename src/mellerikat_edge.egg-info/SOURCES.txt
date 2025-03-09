@@ -11,5 +11,6 @@ src/mellerikatedge/__init__.py
 src/mellerikatedge/cli.py
 src/mellerikatedge/edge_app.py
 src/mellerikatedge/edge_client.py
+src/mellerikatedge/edge_config.py
 src/mellerikatedge/edge_utils.py
 src/mellerikatedge/version.py
