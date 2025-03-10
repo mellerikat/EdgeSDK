@@ -18,7 +18,7 @@ def edge_inference(input_file):
         return
 
     emulator = Emulator(CONFIG_FILE_NAME)
-    emulator.init()
+    emulator.register()
     status = emulator.start(onetime_run=True)
     print(f"Emulator Status : {status}")
     if status == Emulator.STATUS_INFERENCE_READY:

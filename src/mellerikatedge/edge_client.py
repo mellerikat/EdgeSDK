@@ -68,6 +68,10 @@ class EdgeClient:
                 if "deploy_model" in message_dict:
                     deploy_model = message_dict["deploy_model"]
                     self.edge_app._receive_deploy_model_message(deploy_model)
+                elif "update_edge" in message_dict:
+                    edge_state = message_dict["update_edge"]
+                    self.edge_app._update_state(edge_state)
+                    # "update_edge":{"edge_state":"registered"}
         except websockets.ConnectionClosed:
             logger.info("Connection closed")
 

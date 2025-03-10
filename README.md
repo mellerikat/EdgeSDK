@@ -81,7 +81,7 @@ emulator = edge_app.Emulator('edge_config.yaml')
 #========================== SDK Edge App ============================#
 # Edge App registration requested.                                   #
 #====================================================================#
-emulator.init()
+emulator.register()
 
 #========================== Edge Conductor ==========================#
 # Register SDK Edge App                                              #

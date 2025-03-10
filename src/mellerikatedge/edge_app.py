@@ -14,8 +14,8 @@ from loguru import logger
 import subprocess
 
 class Emulator:
-    STATUS_READY = "ready"
-    STATUS_REGISTER = "register"
+    STATUS_INIT = "init"
+    STATUS_REQUEST_REGISTER = "register"
     STATUS_NO_STREAM = "no_stream"
     STATUS_INFERENCE_READY = "inference"
     STATUS_ERROR = "error"
@@ -63,17 +63,14 @@ class Emulator:
         if not os.path.exists(self.alo_dir):
             logger.error(f"ALO {self.alo_dir} does not exist.")
             self.status = self.STATUS_ERROR
-            return
 
         if not os.path.exists(self.alo_dir):
             logger.error(f"ALO {self.alo_dir} does not exist.")
             self.status = self.STATUS_ERROR
-            return
 
         if not os.path.exists(self.solution_dir):
             logger.error(f"AI Solution {self.solution_dir} does not exist.")
             self.status = self.STATUS_ERROR
-            return
 
         if not os.path.exists(self.edge_dir):
             os.makedirs(self.edge_dir)
@@ -84,35 +81,44 @@ class Emulator:
         if not os.path.exists(self.inference_data_dir):
             os.makedirs(self.inference_data_dir)
 
-        self.status = self.STATUS_READY
+        if self.status != self.STATUS_ERROR:
+            self.status = self.STATUS_INIT
 
         self.client = EdgeClient(self, self.edge_config)
 
-    def init(self):
+    def register(self):
         if not self.client.check_authenticate():
             if not self.client.authenticate():
                 device_info = edge_utils.get_device_info()
                 if self.client.request_register(device_info):
                     logger.info(f"Registration requested for {self.edge_config.get_config(EdgeConfig.SECURITY_KEY)}.")
-                    self.status = self.STATUS_REGISTER
+                    self.status = self.STATUS_REQUEST_REGISTER
                 else:
                     logger.error("Request registration Error")
                     self.status = self.STATUS_ERROR
-                return False
-        return True
+                    return self.status
+
+        if self.status == self.STATUS_ERROR:
+            self.status = self.STATUS_REQUEST_REGISTER
+        return self.status
+
+    def _update_state(self, edge_state):
+        logger.info(f"Update State : {edge_state}")
+        if edge_state['edge_state'] == "registered":
+            self.status = self.STATUS_NO_STREAM
 
     def start(self, onetime_run=False):
+        if not self.client.check_authenticate():
+            if not self.client.authenticate():
+                logger.warning("Execute init first.")
+                self.status = self.STATUS_ERROR
+                return self.status
+
         if self.status == self.STATUS_ERROR:
             logger.error('The environment is not one in which the "mellerikat edge" can operate.')
             return self.status
 
-        if not self.client.check_authenticate():
-            if not self.client.authenticate():
-                logger.warning("Execute init first.")
-                self.status = self.STATUS_READY
-                return self.status
-
-        if onetime_run == False and self.deployed_model_info is None and (self.status == self.STATUS_READY or self.status == self.STATUS_REGISTER):
+        if onetime_run == False:
             self.client.connect()
 
         if self.deployed_model_info is None:
@@ -124,12 +130,12 @@ class Emulator:
 
             if edge_details.get('edge_state') == 'requested':
                 logger.error("Register the Edge App on Edge Conductor.")
-                self.status = self.STATUS_REGISTER
+                self.status = self.STATUS_REQUEST_REGISTER
                 return self.status
 
             if deployed_info is None and deploy_info is None:
                 logger.error("The model must be deployed from Edge Conductor.")
-                self.status = self.STATUS_REGISTER
+                self.status = self.STATUS_NO_STREAM
                 return self.status
 
             if deploy_info != None:
@@ -151,13 +157,22 @@ class Emulator:
     def stop(self):
         self.client.disconnect()
 
+    def get_status(self):
+        return self.status
+
     def get_deployed_model_info(self):
+        if self.deployed_model_info is None:
+            return None
         return self.deployed_model_info.copy()
 
     def get_inference_parameter(self):
+        if self.inference_parameter is None:
+            return None
         return self.inference_parameter.copy()
 
     def get_train_parameter(self):
+        if self.train_parameter is None:
+            return None
         return self.train_parameter.copy()
 
     def _receive_deploy_model_message(self, new_model_info):
