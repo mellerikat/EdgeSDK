@@ -7,7 +7,6 @@ import json
 import glob
 import zipfile
 import shutil
-from loguru import logger
 
 from ruamel.yaml import YAML
 yaml = YAML()

@@ -27,18 +27,12 @@ class EdgeConfig:
             with cls._lock:
                 if not cls._instance:
                     cls._instance = super().__new__(cls)
-                    cls._instance.init()
         return cls._instance
-
-    def init(self):
-        logger.info("Init Config")
 
     def load_config(self, config_path):
         with self._lock:
             self.config = edge_utils.load_yaml(config_path)
             self.config_path = config_path
-            logger.info("Load Config")
-            logger.info(self.config)
 
     def save_config(self):
         with self._lock:
@@ -50,5 +44,4 @@ class EdgeConfig:
 
     def set_config(self, name, values):
         with self._lock:
-            # logger.info(f"Update {name} - {values}")
             self.config[name] = values

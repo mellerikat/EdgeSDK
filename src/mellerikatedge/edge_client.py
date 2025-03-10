@@ -23,8 +23,9 @@ class EdgeClient:
     jwt_token = None
     websocket = None
 
-    def __init__(self, edge_app, config):
+    def __init__(self, edge_app, config, logger_edge):
         self.edge_app = edge_app
+        self.logger_edge = logger_edge
         nest_asyncio.apply()
 
         self.url = edge_utils.remove_trailing_slash(config.get_config(EdgeConfig.EDGECOND_URL))
@@ -38,7 +39,7 @@ class EdgeClient:
         self.loop = asyncio.new_event_loop()
         self.thread = None
         self._stop_event = asyncio.Event()
-        logger.info(f"WebSocket URL: {self.websocket_url}")
+        self.logger_edge.info(f"WebSocket URL: {self.websocket_url}")
 
 
     async def connect_edgeconductor(self):
@@ -46,12 +47,12 @@ class EdgeClient:
         while not self._stop_event.is_set():
             try:
                 self.websocket = await websockets.connect(self.websocket_url, extra_headers=headers)
-                logger.info('WebSocket connected')
+                self.logger_edge.info('WebSocket connected')
                 asyncio.create_task(self._receive_messages())
                 asyncio.create_task(self._keep_alive())
                 await self._stop_event.wait()
             except websockets.ConnectionClosed:
-                logger.warning("Connection closed, reconnecting in 2 seconds...")
+                self.logger_edge.warning("Connection closed, reconnecting in 2 seconds...")
                 await asyncio.sleep(2)
 
     async def _keep_alive(self):
@@ -63,7 +64,7 @@ class EdgeClient:
         try:
             while not self._stop_event.is_set():
                 message = await self.websocket.recv()
-                logger.info(f"Received message: {message}")
+                self.logger_edge.info(f"Received message: {message}")
                 message_dict = json.loads(message)
                 if "deploy_model" in message_dict:
                     deploy_model = message_dict["deploy_model"]
@@ -73,15 +74,15 @@ class EdgeClient:
                     self.edge_app._update_state(edge_state)
                     # "update_edge":{"edge_state":"registered"}
         except websockets.ConnectionClosed:
-            logger.info("Connection closed")
+            self.logger_edge.info("Connection closed")
 
     async def close_websocket(self):
         if self.websocket:
             try:
                 await self.websocket.close()
-                logger.info("WebSocket closed")
+                self.logger_edge.info("WebSocket closed")
             except Exception as e:
-                logger.error(f"Failed to close websocket: {e}")
+                self.logger_edge.error(f"Failed to close websocket: {e}")
         self.websocket = None
 
     def run_loop(self):
@@ -96,9 +97,9 @@ class EdgeClient:
             if self.thread is None or not self.thread.is_alive():
                 self.thread = threading.Thread(target=self.run_loop, daemon=True)
                 self.thread.start()
-                logger.info("WebSocket thread started")
+                self.logger_edge.info("WebSocket thread started")
         else:
-            logger.debug("Already connected")
+            self.logger_edge.debug("Already connected")
 
     def disconnect(self):
         if self.loop.is_running():
@@ -108,8 +109,8 @@ class EdgeClient:
             if self.thread:
                 self.thread.join(timeout=5)
                 if self.thread.is_alive():
-                    logger.warning("WebSocket thread did not terminate gracefully")
-            logger.info("WebSocket thread stopped")
+                    self.logger_edge.warning("WebSocket thread did not terminate gracefully")
+            self.logger_edge.info("WebSocket thread stopped")
 
     def request_register(self, device_info):
         url = f"{self.url}/app/api/v1/edges"
@@ -128,15 +129,15 @@ class EdgeClient:
 
 
         if response.status_code == 201:
-            logger.info("Success!")
-            logger.info("Response JSON:", response.json())
+            self.logger_edge.info("Success!")
+            self.logger_edge.info("Response JSON:", response.json())
             return True
         elif response.status_code == 202:
-            logger.info("Accepted")
+            self.logger_edge.info("Accepted")
         else:
-            logger.info("Failed!")
-            logger.info("Status Code:", response.status_code)
-            logger.info("Response:", response.text)
+            self.logger_edge.info("Failed!")
+            self.logger_edge.info("Status Code:", response.status_code)
+            self.logger_edge.info("Response:", response.text)
         return False
 
     def check_authenticate(self):
@@ -166,10 +167,10 @@ class EdgeClient:
         if response.status_code == 200:
             token = response.json()["access_token"]
             self.jwt_token = token
-            logger.info("JWT Token: ", token)
+            self.logger_edge.info("JWT Token: ", token)
             return True
         else:
-            logger.warning("Failed to authenticate:", response.status_code, response.text)
+            self.logger_edge.warning("Failed to authenticate:", response.status_code, response.text)
             return False
 
     def read_info(self):
@@ -184,28 +185,28 @@ class EdgeClient:
         response.raise_for_status()
         edge_details = response.json()
         if edge_details:
-            logger.info("GET Success!")
-            logger.info("Edge Details:")
-            logger.info(f"Edge ID: {edge_details.get('edge_id')}")
-            logger.info(f"Edge Name: {edge_details.get('edge_name', 'N/A')}")
-            logger.info(f"Edge Desc: {edge_details.get('edge_desc', 'N/A')}")
-            logger.info(f"Edge Location: {edge_details.get('edge_location', 'N/A')}")
-            logger.info(f"Edge State: {edge_details.get('edge_state')}")
-            logger.info(f"Edge Status: {edge_details.get('edge_status', 'N/A')}")
-            logger.info(f"Created At: {edge_details.get('created_at', 'N/A')}")
-            logger.info(f"Creator: {edge_details.get('creator', 'N/A')}")
+            self.logger_edge.info("GET Success!")
+            self.logger_edge.info("Edge Details:")
+            self.logger_edge.info(f"Edge ID: {edge_details.get('edge_id')}")
+            self.logger_edge.info(f"Edge Name: {edge_details.get('edge_name', 'N/A')}")
+            self.logger_edge.info(f"Edge Desc: {edge_details.get('edge_desc', 'N/A')}")
+            self.logger_edge.info(f"Edge Location: {edge_details.get('edge_location', 'N/A')}")
+            self.logger_edge.info(f"Edge State: {edge_details.get('edge_state')}")
+            self.logger_edge.info(f"Edge Status: {edge_details.get('edge_status', 'N/A')}")
+            self.logger_edge.info(f"Created At: {edge_details.get('created_at', 'N/A')}")
+            self.logger_edge.info(f"Creator: {edge_details.get('creator', 'N/A')}")
 
             deployed_info = edge_details.get("deployed_info", {})
             deploy_model = edge_details.get("deploy_model", {})
             update_docker = edge_details.get("update_edge_docker", {})
 
-            logger.info(f"\nDeployed Info: {deployed_info}")
-            logger.info(f"Deploy Model: {deploy_model}")
-            logger.info(f"Update Edge Docker: {update_docker}")
+            self.logger_edge.info(f"\nDeployed Info: {deployed_info}")
+            self.logger_edge.info(f"Deploy Model: {deploy_model}")
+            self.logger_edge.info(f"Update Edge Docker: {update_docker}")
 
             return edge_details
         else:
-            logger.error("GET Failed!")
+            self.logger_edge.error("GET Failed!")
             return None
 
     def download_model(self, model_seq, download_dir):
@@ -222,20 +223,20 @@ class EdgeClient:
             if content_disposition:
                 file_name = content_disposition.split('filename=')[-1].strip().strip("\"'")
             else:
-                logger.warning("Content-Disposition header is missing.")
+                self.logger_edge.warning("Content-Disposition header is missing.")
                 file_name = f"model.tar.gz"
 
             file_path = os.path.join(download_dir, 'model.tar.gz')
             with open(file_path, 'wb') as file:
                 for chunk in response.iter_content(chunk_size=8192):
                     file.write(chunk)
-            logger.info(f"{file_name} downloaded successfully.")
+            self.logger_edge.info(f"{file_name} downloaded successfully.")
         else:
-            logger.error("Failed to download the file:", response.status_code, response.text)
+            self.logger_edge.error("Failed to download the file:", response.status_code, response.text)
 
     def download_metadata(self, model_seq, download_dir):
         url = f"{self.url}/app/api/v1/models/{model_seq}/meta-data"
-        logger.info(url)
+        self.logger_edge.info(url)
 
         headers = {
             "Authorization": f"Bearer {self.jwt_token}",
@@ -248,13 +249,13 @@ class EdgeClient:
             file_path = os.path.join(download_dir, 'meta.json')
             with open(file_path, 'w') as file:
                 json.dump(metadata, file, indent=2)
-            logger.info(f"meta.json downloaded successfully.")
+            self.logger_edge.info(f"meta.json downloaded successfully.")
         else:
-            logger.error("Failed to download the file:", response.status_code, response.text)
+            self.logger_edge.error("Failed to download the file:", response.status_code, response.text)
 
     def update_deploy_status(self, model_seq, status):
         url = f"{self.url}/app/api/v1/models/{model_seq}/deploy-result"
-        logger.info(url)
+        self.logger_edge.info(url)
 
         current_time = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 
@@ -269,10 +270,10 @@ class EdgeClient:
 
         response = requests.put(url, headers=headers, json=data)
         if response.status_code == 200:
-            logger.info("Successfully updated deploy result.")
+            self.logger_edge.info("Successfully updated deploy result.")
             return True
         else:
-            logger.error("Failed to update deploy result:", response.status_code, response.text)
+            self.logger_edge.error("Failed to update deploy result:", response.status_code, response.text)
             return False
 
     def update_inference_status(self, status):
@@ -289,16 +290,16 @@ class EdgeClient:
         response = requests.put(url, headers=headers, json=data)
 
         if response.status_code == 200:
-            logger.info("Successfully updated inference status.")
-            logger.info("Response:", response.json())
+            self.logger_edge.info("Successfully updated inference status.")
+            self.logger_edge.info("Response:", response.json())
             return True
         else:
-            logger.error("Failed to update inference status:", response.status_code, response.text)
+            self.logger_edge.error("Failed to update inference status:", response.status_code, response.text)
             return False
 
     def upload_inference_result(self, result_info, zip_path):
         url = f"{self.url}/app/api/v1/inference/file"
-        logger.info(url)
+        self.logger_edge.info(url)
 
         current_time = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 
@@ -318,7 +319,7 @@ class EdgeClient:
             "non-tabular": result_info['non-tabular'],
         }
 
-        logger.debug(data)
+        self.logger_edge.debug(data)
 
         if len(result_info['probability']) != 0:
            data["probability"] = result_info['probability']
@@ -332,9 +333,9 @@ class EdgeClient:
         files["file"].close()
 
         if response.status_code == 201:
-            logger.info("Successfully upload inference result.")
+            self.logger_edge.info("Successfully upload inference result.")
             return True
         else:
-            logger.error("Failed to upload inference result:", response.status_code, response.text)
+            self.logger_edge.error("Failed to upload inference result:", response.status_code, response.text)
             return False
 

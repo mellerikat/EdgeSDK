@@ -1,6 +1,6 @@
 Metadata-Version: 2.2
 Name: mellerikat-edge
-Version: 1.0.3
+Version: 1.0.4
 Summary: Receives the inference model from Mellerikat on Edge and performs inference
 Home-page: https://github.com/mellerikat/EdgeSDK
 Author: Mellerikat

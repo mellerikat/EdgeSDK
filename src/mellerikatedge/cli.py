@@ -18,7 +18,7 @@ def edge_inference(input_file):
         return
 
     emulator = Emulator(CONFIG_FILE_NAME)
-    emulator.register()
+    # emulator.register()
     status = emulator.start(onetime_run=True)
     print(f"Emulator Status : {status}")
     if status == Emulator.STATUS_INFERENCE_READY:
@@ -120,7 +120,7 @@ def edge_init(args):
     print(f"Edge Conductor Installation Location: {'cloud' if edge_conductor_location == '1' else 'on-premise'}")
 
     emulator = Emulator(CONFIG_FILE_NAME)
-    exist_edge = emulator.init()
+    exist_edge = emulator.register()
     if exist_edge:
         print("This Edge is already registered. Change the Serial Name if you want to use a different Edge.")
     else:
