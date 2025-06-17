@@ -1,6 +1,6 @@
-Metadata-Version: 2.2
+Metadata-Version: 2.4
 Name: mellerikat-edge
-Version: 1.0.4
+Version: 1.0.7
 Summary: Receives the inference model from Mellerikat on Edge and performs inference
 Home-page: https://github.com/mellerikat/EdgeSDK
 Author: Mellerikat
@@ -16,5 +16,6 @@ Requires-Dist: nest_asyncio
 Dynamic: author
 Dynamic: author-email
 Dynamic: home-page
+Dynamic: license-file
 Dynamic: requires-dist
 Dynamic: summary

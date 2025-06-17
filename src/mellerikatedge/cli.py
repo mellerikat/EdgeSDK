@@ -22,7 +22,7 @@ def edge_inference(input_file):
     status = emulator.start(onetime_run=True)
     print(f"Emulator Status : {status}")
     if status == Emulator.STATUS_INFERENCE_READY:
-        if emulator.inference_file("/home/gyulim.gu/projects/edge_sdk_test/inference_dataset_sdk.csv"):
+        if emulator.inference_file(input_file):
             if emulator.upload_inference_result():
                 print(f"Inference and upload successful for '{input_file}'.")
             else:

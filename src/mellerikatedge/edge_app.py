@@ -12,8 +12,12 @@ import importlib
 from loguru import logger
 
 import subprocess
+import threading
 
 class Emulator:
+
+    _lock = threading.Lock()
+
     STATUS_INIT = "init"
     STATUS_REQUEST_REGISTER = "register"
     STATUS_NO_STREAM = "no_stream"
@@ -29,9 +33,13 @@ class Emulator:
         config_dir = os.path.dirname(config_path)
         self.log_path = os.path.join(config_dir, 'edge.log')
 
-
-        self.logger_edge = logger.bind(name="mellerikat-edge")
-        self.logger_edge.add(self.log_path, format="{time:YYYY-MM-DD HH:mm:ss}|{level}|{file}:{line}|{message}")
+        print(self.edge_config.get_config(EdgeConfig.SECURITY_KEY))
+        self.logger_edge = logger.bind(name=self.edge_config.get_config(EdgeConfig.SECURITY_KEY))
+        self.logger_edge.add(
+            self.log_path,
+            format="{time:YYYY-MM-DD HH:mm:ss}|{level}|{file}:{line}|{message}",
+            filter=lambda record: record["extra"].get("name") == self.edge_config.get_config(EdgeConfig.SECURITY_KEY)
+        )
         # self.logger_edge.remove()
         # self.logger_edge.add(self.log_path, format="{time:YYYY-MM-DD HH:mm:ss}|{level}|{file}:{line}|{message}")
 
@@ -107,7 +115,7 @@ class Emulator:
 
     def _update_state(self, edge_state):
         self.logger_edge.info(f"Update State : {edge_state}")
-        if edge_state['edge_state'] == "registered":
+        if edge_state['edge_state'] == "registered" and self.status != self.STATUS_INFERENCE_READY:
             self.status = self.STATUS_NO_STREAM
 
     def start(self, onetime_run=False):
@@ -123,9 +131,6 @@ class Emulator:
             self.logger_edge.error('The environment is not one in which the "mellerikat edge" can operate.')
             return self.status
 
-        if onetime_run == False:
-            self.client.connect()
-
         if self.deployed_model_info is None:
             new_model_info = None
 
@@ -136,14 +141,10 @@ class Emulator:
             if edge_details.get('edge_state') == 'requested':
                 self.logger_edge.error("Register the Edge App on Edge Conductor.")
                 self.status = self.STATUS_REQUEST_REGISTER
-                return self.status
-
-            if deployed_info is None and deploy_info is None:
+            elif deployed_info is None and deploy_info is None:
                 self.logger_edge.error("The model must be deployed from Edge Conductor.")
                 self.status = self.STATUS_NO_STREAM
-                return self.status
-
-            if deploy_info != None:
+            elif deploy_info != None:
                 self.logger_edge.info("Deploy new model")
                 new_model_info = deploy_info
             elif deployed_info is not None:
@@ -156,6 +157,9 @@ class Emulator:
 
             if new_model_info is not None:
                 self._deploy_model(new_model_info)
+
+        if onetime_run == False:
+            self.client.connect()
 
         return self.status
 
@@ -378,7 +382,7 @@ class Emulator:
 
             image_path = edge_utils.find_image_file(output_folder)
             if image_path is not None:
-                tabular_path = f"output/{image_path}"
+                image_path = f"output/{image_path}"
         else:
             zip_path = os.path.join(self.inference_artifact_dir, 'inference_artifacts.zip')
             image_path, tabular_path, score_yaml = edge_utils.parse_inference_artifacts(zip_path)
